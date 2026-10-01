@@ -36,11 +36,13 @@ public class RestaurantController
 	private final FinanceRepository finance;
 	private final ExpenseRepository expenses;
 	private final CurrentActor currentActor;
+	private final FamilyRepository family;
 	private final Clock clock;
 
 	public RestaurantController(RestaurantSalesRepository sales, RestaurantService service, FinanceRepository finance,
-								ExpenseRepository expenses, CurrentActor currentActor, Clock clock)
+								ExpenseRepository expenses, CurrentActor currentActor, FamilyRepository family, Clock clock)
 	{
+		this.family = family;
 		this.sales = sales;
 		this.service = service;
 		this.finance = finance;
@@ -86,6 +88,9 @@ public class RestaurantController
 		model.addAttribute("daysEntered", rows.size());
 		model.addAttribute("expensesTotal", spent);
 		model.addAttribute("expenseCount", monthExpenses.size());
+		model.addAttribute("familyByMember", family.byMember(from, to));
+		model.addAttribute("familyTotal", family.total(from, to));
+		model.addAttribute("familyYear", family.byMember(from.withDayOfYear(1), to));
 		model.addAttribute("isAdmin", actor.isAdmin());
 		if (actor.isAdmin())
 		{

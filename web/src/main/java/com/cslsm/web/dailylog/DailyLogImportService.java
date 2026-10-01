@@ -3,6 +3,16 @@ package com.cslsm.web.dailylog;
 import com.cslsm.web.dailylog.DailyLogParser.DailyLogException;
 import com.cslsm.web.dailylog.DailyLogParser.ParsedDay;
 import com.cslsm.web.restaurant.RestaurantSalesRepository;
+import java.time.temporal.ChronoUnit;
+import java.time.Instant;
+import com.cslsm.web.support.Money;
+import com.cslsm.web.expenses.ExpenseModels.Option;
+import com.cslsm.web.expenses.ExpenseModels.ExpenseDraft;
+import com.cslsm.web.expenses.ExpenseSheetParser;
+import com.cslsm.web.expenses.ExpenseService;
+import com.cslsm.web.expenses.ExpenseOptionRepository;
+import com.cslsm.web.expenses.ExpenseRepository;
+import com.cslsm.web.restaurant.FamilyRepository;
 import com.cslsm.web.salon.SalonSalesRepository;
 import com.cslsm.web.support.Actor;
 import com.cslsm.web.support.AuditService;
@@ -48,13 +58,17 @@ public class DailyLogImportService
 	private final DailyLogRepository repo;
 	private final RestaurantSalesRepository restaurantSales;
 	private final SalonSalesRepository salonSales;
+	private final FamilyRepository family;
+	private final ExpenseRepository expenseRepo;
+	private final ExpenseOptionRepository options;
 	private final FileStorage storage;
 	private final AuditService audit;
 	private final TransactionTemplate tx;
 	private final Clock clock;
 
 	public DailyLogImportService(DailyLogParser parser, List<UnitLogParser> unitParsers, DailyLogRepository repo,
-								 RestaurantSalesRepository restaurantSales, SalonSalesRepository salonSales, FileStorage storage,
+								 RestaurantSalesRepository restaurantSales, SalonSalesRepository salonSales, FamilyRepository family,
+								 ExpenseRepository expenseRepo, ExpenseOptionRepository options, FileStorage storage,
 								 AuditService audit, TransactionTemplate tx, Clock clock)
 	{
 		this.parser = parser;
@@ -62,6 +76,9 @@ public class DailyLogImportService
 		this.repo = repo;
 		this.restaurantSales = restaurantSales;
 		this.salonSales = salonSales;
+		this.family = family;
+		this.expenseRepo = expenseRepo;
+		this.options = options;
 		this.storage = storage;
 		this.audit = audit;
 		this.tx = tx;
@@ -281,13 +298,23 @@ public class DailyLogImportService
 			return refuse(name, date, sha, "No figures were found in the expected cells. Is this " + label + "'s template?", actor, unit);
 		}
 		List<String> warnings = new ArrayList<>();
-		if (day.card() > day.total() + TOLERANCE)
+		if (day.card() + day.onAccount() > day.total() + TOLERANCE)
 		{
-			warnings.add("Card " + money(day.card()) + " is more than the day's total " + money(day.total()) + ".");
+			warnings.add("Card " + money(day.card()) + (day.onAccount() > 0 ? " and family " + money(day.onAccount()) : "")
+					+ " are more than the day's total " + money(day.total()) + ".");
 		}
-		if (day.total() < 0 || day.card() < 0)
+		if (day.cashLeft() < -TOLERANCE)
+		{
+			warnings.add("The till paid out " + money(day.tillExpenses()) + " with only " + money(day.cash()) + " of cash sales.");
+		}
+		if (day.total() < 0 || day.card() < 0 || day.onAccount() < 0)
 		{
 			warnings.add("The file contains a negative amount.");
+		}
+		List<String> lineProblems = lineProblems(day);
+		if (!lineProblems.isEmpty())
+		{
+			return refuse(name, date, sha, String.join(" ", lineProblems), actor, unit);
 		}
 		repo.otherDateWithSameContent(sha, date, unit).ifPresent(other ->
 				warnings.add("This file is identical to the one imported for " + other + ". Was it copied and renamed?"));
@@ -304,12 +331,13 @@ public class DailyLogImportService
 		boolean replacing = existing.isPresent();
 		String status = replacing ? "REPLACED" : "IMPORTED";
 		String note = day.note() == null ? "file " + name : day.note();
+		List<Long> previous = repo.importIdsFor(unit, date);
 		try
 		{
 			tx.executeWithoutResult(s -> {
 				if ("RESTAURANT".equals(unit))
 				{
-					restaurantSales.upsert(date, day.cash(), day.card(), day.people(), note, actor.displayName());
+					restaurantSales.upsert(date, day.cash(), day.card(), day.onAccount(), day.people(), note, actor.displayName());
 				}
 				else
 				{
@@ -317,10 +345,29 @@ public class DailyLogImportService
 				}
 				long importId = repo.insertImport(date, name, stored, sha, (long) bytes.length, status, day.total(), warnings, null,
 						actor.username(), unit);
+				// A replaced file replaces what the earlier one created
+				int oldMeals = family.deleteFromImports(previous);
+				int oldExpenses = expenseRepo.deleteFromImports(previous);
+				for (UnitLogParser.FamilyLine f : day.family())
+				{
+					family.insert(date, f.member(), f.amount(), f.note(), importId);
+				}
+				double expensesTotal = 0;
+				for (UnitLogParser.ExpenseLine e : day.expenses())
+				{
+					long id = expenseRepo.insert(new ExpenseDraft(date, category(e.category()), e.object(), e.amount(), "CASH",
+							ExpenseService.RESTAURANT_ACTIVITY, "RESTAURANT", actor.isAdmin() ? "APPROVED" : "PENDING",
+							actor.displayName(), actor.isAdmin() ? actor.displayName() : null,
+							actor.isAdmin() ? Instant.now().truncatedTo(ChronoUnit.SECONDS).toString() : null, actor.id()));
+					expenseRepo.markSource(id, importId);
+					expensesTotal += e.amount();
+				}
 				audit.record(actor, (replacing ? "DAILY_LOG_REPLACE" : "DAILY_LOG_IMPORT"), unit.toLowerCase(Locale.ROOT) + "_sales", date,
 						"file=" + name + ", total=" + money(day.total()) + ", card=" + money(day.card())
-								+ (replacing ? ", previous total=" + money(existing.get()) : "") + ", import #" + importId
-								+ (warnings.isEmpty() ? "" : ", warnings=" + warnings.size()));
+								+ (day.onAccount() > 0 ? ", family=" + money(day.onAccount()) + " (" + day.family().size() + " meals)" : "")
+								+ (day.expenses().isEmpty() ? "" : ", till expenses=" + money(expensesTotal) + " (" + day.expenses().size() + ")")
+								+ (replacing ? ", previous total=" + money(existing.get()) + ", removed " + oldMeals + " meal(s) and " + oldExpenses + " expense(s)" : "")
+								+ ", import #" + importId + (warnings.isEmpty() ? "" : ", warnings=" + warnings.size()));
 			});
 		}
 		catch (RuntimeException e)
@@ -329,9 +376,58 @@ public class DailyLogImportService
 			throw e;
 		}
 		String message = (replacing ? "Replaced " : "Imported ") + label + " " + date + ": " + money(day.total())
-				+ " (card " + money(day.card()) + ", cash " + money(day.cash()) + ")"
-				+ (replacing ? " — was " + money(existing.get()) : "") + ".";
+				+ " (card " + money(day.card()) + ", cash " + money(day.cash())
+				+ (day.onAccount() > 0 ? ", family " + money(day.onAccount()) : "")
+				+ (day.expenses().isEmpty() ? "" : ", " + day.expenses().size() + " expense(s) from the till" + (actor.isAdmin() ? "" : " waiting for approval"))
+				+ ")" + (replacing ? " — was " + money(existing.get()) : "") + ".";
 		return new Outcome(name, date, true, replacing, day.total(), message, warnings);
+	}
+
+	/** Family and expense lines that cannot be saved as they are; the file is refused so it gets fixed, not half-imported. */
+	private static List<String> lineProblems(UnitLogParser.ParsedUnitDay day)
+	{
+		List<String> out = new ArrayList<>();
+		for (UnitLogParser.FamilyLine f : day.family())
+		{
+			if (f.member() == null)
+			{
+				out.add("Row " + f.rowNumber() + ": a family line needs a name.");
+			}
+			else if (f.amount() <= 0 || f.amount() > Money.MAX_AMOUNT)
+			{
+				out.add("Row " + f.rowNumber() + ": check the amount for " + f.member() + ".");
+			}
+		}
+		for (UnitLogParser.ExpenseLine e : day.expenses())
+		{
+			if (e.object() == null)
+			{
+				out.add("Row " + e.rowNumber() + ": an expense line needs an object.");
+			}
+			else if (e.amount() <= 0 || e.amount() > Money.MAX_AMOUNT)
+			{
+				out.add("Row " + e.rowNumber() + ": check the amount for " + e.object() + ".");
+			}
+		}
+		return out;
+	}
+
+	/** The category typed on the file, by name or alias; a restaurant's purchases otherwise. */
+	private String category(String text)
+	{
+		if (text != null)
+		{
+			Optional<Option> found = options.findCategory(text);
+			if (found.isEmpty() && ExpenseSheetParser.categoryAlias(text) != null)
+			{
+				found = options.findCategory(ExpenseSheetParser.categoryAlias(text));
+			}
+			if (found.isPresent())
+			{
+				return found.get().name();
+			}
+		}
+		return options.findCategory("Food & drinks").map(Option::name).orElse("Other");
 	}
 
 	private Outcome refuse(String name, LocalDate date, String sha, String reason, Actor actor, String unit)

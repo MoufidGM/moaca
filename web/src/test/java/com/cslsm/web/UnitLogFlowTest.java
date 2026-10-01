@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -100,9 +101,105 @@ class UnitLogFlowTest
 		}
 	}
 
+	/** Tiki Taka's file with the family and till-expenses blocks (rows 65+ and 85+ of the template). */
+	private static byte[] restaurantFile(double total, double card, double family, double tillExpenses, int covers,
+										 String[][] familyLines, String[][] expenseLines) throws Exception
+	{
+		try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream())
+		{
+			Sheet sh = wb.createSheet("Daily");
+			sh.createRow(4).createCell(1).setCellValue(total);
+			sh.createRow(5).createCell(1).setCellValue(card);
+			sh.createRow(6).createCell(1).setCellValue(family);
+			sh.createRow(7).createCell(1).setCellValue(tillExpenses);
+			sh.createRow(9).createCell(1).setCellValue(covers);
+			int row = 64;
+			for (String[] f : familyLines)
+			{
+				org.apache.poi.ss.usermodel.Row r = sh.createRow(row++);
+				r.createCell(0).setCellValue(f[0]);
+				if (!f[1].isEmpty()) r.createCell(1).setCellValue(Double.parseDouble(f[1]));
+				if (f.length > 2) r.createCell(2).setCellValue(f[2]);
+			}
+			row = 84;
+			for (String[] e : expenseLines)
+			{
+				org.apache.poi.ss.usermodel.Row r = sh.createRow(row++);
+				r.createCell(0).setCellValue(e[0]);
+				r.createCell(1).setCellValue(e[1]);
+				if (!e[2].isEmpty()) r.createCell(2).setCellValue(Double.parseDouble(e[2]));
+			}
+			wb.write(out);
+			return out.toByteArray();
+		}
+	}
+
+	/** Tiki Taka's file, summary only: B5 total, B6 card, B10 covers, B11 note. */
+	private static byte[] ttFile(double total, double card, int people, String note) throws Exception
+	{
+		try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream())
+		{
+			Sheet sh = wb.createSheet("Daily");
+			sh.createRow(4).createCell(1).setCellValue(total);
+			sh.createRow(5).createCell(1).setCellValue(card);
+			sh.createRow(9).createCell(1).setCellValue(people);
+			if (note != null) sh.createRow(10).createCell(1).setCellValue(note);
+			wb.write(out);
+			return out.toByteArray();
+		}
+	}
+
 	private static MockMultipartFile upload(String prefix, LocalDate date, byte[] content)
 	{
 		return new MockMultipartFile("files", prefix + "-" + date.format(DL) + ".xlsx", "application/octet-stream", content);
+	}
+
+	@Test
+	void restaurantFileCarriesTheFamilysMealsAndTheTillsExpenses() throws Exception
+	{
+		LocalDate day = TODAY.minusDays(5);
+		// Sales 2 000 at menu value: 300 by card, 180 eaten by the family, 250 paid out of the till
+		byte[] file = restaurantFile(2000, 300, 180, 250, 20,
+				new String[][]{{"M Radouane", "67.5"}, {"Mme Kenza", "52.5", "déjeuner"}, {"Amine", "60"}},
+				new String[][]{{"viande hachée", "", "180"}, {"gaz", "Gas", "70"}});
+		double tillBefore = finance.restaurantBalance(TODAY).balance();
+		mvc.perform(multipart("/daily-logs").file(upload("TT", day, file)).with(CHEF).with(csrf())).andExpect(status().is3xxRedirection());
+		Map<String, Object> sale = jdbc.queryForMap("SELECT * FROM restaurant_sales WHERE sale_date = ?", day.toString());
+		assertThat(((Number) sale.get("cash")).doubleValue()).isEqualTo(1520);         // 2 000 − 300 − 180
+		assertThat(((Number) sale.get("card")).doubleValue()).isEqualTo(300);
+		assertThat(((Number) sale.get("on_account")).doubleValue()).isEqualTo(180);
+		assertThat(((Number) sale.get("covers")).intValue()).isEqualTo(20);
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_consumption WHERE sale_date = ?", Integer.class, day.toString())).isEqualTo(3);
+		assertThat(jdbc.queryForObject("SELECT amount FROM family_consumption WHERE member = 'Mme Kenza'", Double.class)).isEqualTo(52.5);
+		// The till's expenses are Tiki Taka expenses from the restaurant till, waiting for approval
+		Map<String, Object> viande = jdbc.queryForMap("SELECT * FROM expense WHERE description = 'viande hachée'");
+		assertThat(viande.get("category")).isEqualTo("Food & drinks");
+		assertThat(viande.get("activity")).isEqualTo("Tiki Taka");
+		assertThat(viande.get("till")).isEqualTo("RESTAURANT");
+		assertThat(viande.get("status")).isEqualTo("PENDING");
+		assertThat(viande.get("source_import_id")).isNotNull();
+		assertThat(jdbc.queryForMap("SELECT * FROM expense WHERE description = 'gaz'").get("category")).isEqualTo("Gas");
+		// Revenue is what is paid; the family's meals are tracked, not sold
+		assertThat(finance.income(day, day)).isEqualTo(1820);
+		assertThat(finance.restaurantBalance(TODAY).balance()).isCloseTo(tillBefore + 1520 - 250, within(0.005));
+
+		// A corrected file replaces the day: old meals and expenses go, the new ones come
+		byte[] fixed = restaurantFile(2000, 300, 120, 180, 20, new String[][]{{"M Radouane", "120"}}, new String[][]{{"viande hachée", "", "180"}});
+		mvc.perform(multipart("/daily-logs").file(upload("TT", day, fixed)).param("replace", "true").with(FIN).with(csrf()));
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_consumption WHERE sale_date = ?", Integer.class, day.toString())).isEqualTo(1);
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense WHERE expense_date = ? AND activity = 'Tiki Taka'", Integer.class, day.toString())).isEqualTo(1);
+		assertThat(jdbc.queryForObject("SELECT status FROM expense WHERE description = 'viande hachée'", String.class)).isEqualTo("APPROVED");
+		assertThat(jdbc.queryForObject("SELECT cash FROM restaurant_sales WHERE sale_date = ?", Double.class, day.toString())).isEqualTo(1580);
+
+		// A family line without a name refuses the whole file; nothing changes
+		byte[] bad = restaurantFile(500, 0, 30, 0, 2, new String[][]{{"", "30"}}, new String[][]{});
+		mvc.perform(multipart("/daily-logs").file(upload("TT", day.minusDays(1), bad)).with(CHEF).with(csrf()));
+		assertThat(jdbc.queryForObject("SELECT message FROM daily_import WHERE log_date = ?", String.class, day.minusDays(1).toString())).contains("needs a name");
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM restaurant_sales WHERE sale_date = ?", Integer.class, day.minusDays(1).toString())).isZero();
+
+		// The manager and the admins see the family's totals on the Tiki Taka page
+		mvc.perform(get("/restaurant").with(CHEF).param("month", day.toString().substring(0, 7))).andExpect(status().isOk())
+				.andExpect(content().string(containsString("M Radouane")));
 	}
 
 	@Test
@@ -111,7 +208,7 @@ class UnitLogFlowTest
 		LocalDate day = TODAY.minusDays(1);
 
 		// The chef uploads Tiki Taka's file
-		mvc.perform(multipart("/daily-logs").file(upload("TT", day, unitFile(450, 100, 12, "Soirée"))).with(CHEF).with(csrf()))
+		mvc.perform(multipart("/daily-logs").file(upload("TT", day, ttFile(450, 100, 12, "Soirée"))).with(CHEF).with(csrf()))
 				.andExpect(status().is3xxRedirection());
 		Map<String, Object> sale = jdbc.queryForMap("SELECT * FROM restaurant_sales WHERE sale_date = ?", day.toString());
 		assertThat(((Number) sale.get("cash")).doubleValue()).isEqualTo(350);
@@ -120,7 +217,7 @@ class UnitLogFlowTest
 		assertThat(sale.get("note")).isEqualTo("Soirée");
 		assertThat(jdbc.queryForObject("SELECT unit FROM daily_import WHERE original_name LIKE 'TT-%' AND status = 'IMPORTED'", String.class)).isEqualTo("RESTAURANT");
 		// The reception uploads all three units' files, Tiki Taka's included
-		mvc.perform(multipart("/daily-logs").file(upload("TT", day.minusDays(1), unitFile(300, 0, 0, null))).with(DESK).with(csrf()));
+		mvc.perform(multipart("/daily-logs").file(upload("TT", day.minusDays(1), ttFile(300, 0, 0, null))).with(DESK).with(csrf()));
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM restaurant_sales", Integer.class)).isEqualTo(2);
 
 		// The chef may not upload the center's or the Salon's
@@ -140,11 +237,11 @@ class UnitLogFlowTest
 		assertThat(finance.income(day, day)).isEqualTo(450 + 260);
 
 		// Bad files are refused with a reason; card above total is a warning
-		mvc.perform(multipart("/daily-logs").file(upload("TT", TODAY.plusDays(1), unitFile(1, 0, 0, null))).with(CHEF).with(csrf()));
+		mvc.perform(multipart("/daily-logs").file(upload("TT", TODAY.plusDays(1), ttFile(1, 0, 0, null))).with(CHEF).with(csrf()));
 		assertThat(jdbc.queryForObject("SELECT message FROM daily_import WHERE log_date = ?", String.class, TODAY.plusDays(1).toString())).contains("future");
-		mvc.perform(multipart("/daily-logs").file(upload("TT", day.minusDays(2), unitFile(0, 0, 0, null))).with(CHEF).with(csrf()));
+		mvc.perform(multipart("/daily-logs").file(upload("TT", day.minusDays(2), ttFile(0, 0, 0, null))).with(CHEF).with(csrf()));
 		assertThat(jdbc.queryForObject("SELECT message FROM daily_import WHERE log_date = ?", String.class, day.minusDays(2).toString())).contains("No figures");
-		mvc.perform(multipart("/daily-logs").file(upload("TT", day.minusDays(3), unitFile(100, 150, 0, null))).with(CHEF).with(csrf()));
+		mvc.perform(multipart("/daily-logs").file(upload("TT", day.minusDays(3), ttFile(100, 150, 0, null))).with(CHEF).with(csrf()));
 		assertThat(jdbc.queryForObject("SELECT warnings FROM daily_import WHERE log_date = ?", String.class, day.minusDays(3).toString())).contains("more than");
 
 		// Pages and templates

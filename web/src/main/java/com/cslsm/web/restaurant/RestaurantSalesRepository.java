@@ -17,7 +17,7 @@ import java.util.Optional;
 public class RestaurantSalesRepository
 {
 	public record Sale(long id, LocalDate date, double cash, double card, Integer covers, String note,
-					   String enteredBy, String updatedAt)
+					   String enteredBy, String updatedAt, double onAccount)
 	{
 		public double total()
 		{
@@ -29,7 +29,7 @@ public class RestaurantSalesRepository
 		int covers = rs.getInt("covers");
 		boolean noCovers = rs.wasNull();
 		return new Sale(rs.getLong("id"), LocalDate.parse(rs.getString("sale_date")), rs.getDouble("cash"), rs.getDouble("card"),
-				noCovers ? null : covers, rs.getString("note"), rs.getString("entered_by"), rs.getString("updated_at"));
+				noCovers ? null : covers, rs.getString("note"), rs.getString("entered_by"), rs.getString("updated_at"), rs.getDouble("on_account"));
 	};
 
 	private final JdbcTemplate jdbc;
@@ -53,12 +53,18 @@ public class RestaurantSalesRepository
 	/** Inserts or replaces the day's figures. */
 	public void upsert(LocalDate date, double cash, double card, Integer covers, String note, String enteredBy)
 	{
+		upsert(date, cash, card, 0, covers, note, enteredBy);
+	}
+
+	/** onAccount: the family's meals of the day at menu value (restaurant), kept apart from cash and card. */
+	public void upsert(LocalDate date, double cash, double card, double onAccount, Integer covers, String note, String enteredBy)
+	{
 		jdbc.update("""
-						INSERT INTO restaurant_sales (sale_date, cash, card, covers, note, entered_by, updated_at)
-						VALUES (?, ?, ?, ?, ?, ?, ?)
-						ON CONFLICT(sale_date) DO UPDATE SET cash = excluded.cash, card = excluded.card, covers = excluded.covers,
-						    note = excluded.note, entered_by = excluded.entered_by, updated_at = excluded.updated_at
-						""", date.toString(), cash, card, covers, note, enteredBy,
+						INSERT INTO restaurant_sales (sale_date, cash, card, on_account, covers, note, entered_by, updated_at)
+						VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+						ON CONFLICT(sale_date) DO UPDATE SET cash = excluded.cash, card = excluded.card, on_account = excluded.on_account,
+						    covers = excluded.covers, note = excluded.note, entered_by = excluded.entered_by, updated_at = excluded.updated_at
+						""", date.toString(), cash, card, onAccount, covers, note, enteredBy,
 				Instant.now().truncatedTo(ChronoUnit.SECONDS).toString());
 	}
 

@@ -17,8 +17,9 @@
     <!-- ===== Today's sales ===== -->
     <article class="card">
       <h2>Sales of the day</h2>
-      <p class="muted small">Either <a th:href="@{/daily-logs}">upload the day's file</a> (TT-dd-MM-yyyy.xlsx, from the
-        <a th:href="@{/daily-logs/template/restaurant}">template</a>), or type the day's totals here.</p>
+      <p class="muted small">The manager <a th:href="@{/daily-logs}">uploads the day's file</a> (TT-dd-MM-yyyy.xlsx, from the
+        <a th:href="@{/daily-logs/template/restaurant}">template</a>): sales, card, the family's meals and the till's expenses in one go.
+        Type the day's totals here only for a day without a file.</p>
       <p class="muted small">Enter the day's takings when the restaurant closes. Entering a day again replaces its figures.</p>
       <form th:action="@{/restaurant/sales}" method="post" class="form">
         <div class="form-grid">
@@ -96,13 +97,14 @@
         <div class="stat-sub"><a th:href="@{/activities/detail(name='Tiki Taka',period='month')}">full analysis with shared costs →</a></div></div>
     </div>
     <table class="table" th:if="${!sales.isEmpty()}">
-      <thead><tr><th>Day</th><th class="num">Cash</th><th class="num">Card</th><th class="num">Total</th><th class="num">Covers</th><th>Note</th><th>By</th><th th:if="${isAdmin}"></th></tr></thead>
+      <thead><tr><th>Day</th><th class="num">Cash</th><th class="num">Card</th><th class="num">Total</th><th class="num">Family</th><th class="num">Covers</th><th>Note</th><th>By</th><th th:if="${isAdmin}"></th></tr></thead>
       <tbody>
       <tr th:each="s : ${sales}">
         <td class="nowrap" th:text="${#temporals.format(s.date(), 'EEE d MMM')}">Mon 1 Sep</td>
         <td class="num" th:text="${#numbers.formatDecimal(s.cash(), 1, 'COMMA', 0, 'POINT')}">0</td>
         <td class="num" th:text="${#numbers.formatDecimal(s.card(), 1, 'COMMA', 0, 'POINT')}">0</td>
         <td class="num strong" th:text="${#numbers.formatDecimal(s.total(), 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num muted" th:text="${s.onAccount() > 0} ? ${#numbers.formatDecimal(s.onAccount(), 1, 'COMMA', 0, 'POINT')} : ''">0</td>
         <td class="num" th:text="${s.covers() != null} ? ${s.covers()} : ''">0</td>
         <td th:text="${s.note()}">note</td>
         <td th:text="${s.enteredBy()}">chef</td>
@@ -116,6 +118,37 @@
       </tbody>
     </table>
     <p class="muted" th:if="${sales.isEmpty()}">No sales entered this month.</p>
+  </section>
+
+  <!-- ===== The family's meals ===== -->
+  <section class="card">
+    <div class="card-head">
+      <h2>The family at Tiki Taka — <span th:text="${monthLabel}">September 2026</span></h2>
+      <span class="muted" th:text="${#numbers.formatDecimal(familyTotal, 1, 'COMMA', 0, 'POINT')} + ' this month'">0</span>
+    </div>
+    <p class="muted small">Meals written in the "Famille / sur compte" block of the daily file, at menu value. Nobody pays them, so they
+      are neither cash nor revenue — only known, per person.</p>
+    <p class="muted" th:if="${familyByMember.isEmpty()}">Nothing this month.</p>
+    <div class="grid grid-2" th:if="${!familyByMember.isEmpty() or !familyYear.isEmpty()}">
+      <table class="table">
+        <thead><tr><th>This month</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+        <tr th:each="m : ${familyByMember}">
+          <td th:text="${m.name}">M Radouane</td>
+          <td class="num" th:text="${#numbers.formatDecimal(m.amount, 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tbody>
+      </table>
+      <table class="table">
+        <thead><tr><th>Since 1 January</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+        <tr th:each="m : ${familyYear}">
+          <td th:text="${m.name}">M Radouane</td>
+          <td class="num" th:text="${#numbers.formatDecimal(m.amount, 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section class="card" th:if="${isAdmin and !movements.isEmpty()}">

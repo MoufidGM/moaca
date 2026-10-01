@@ -169,6 +169,22 @@ public class ExpenseRepository
 		jdbc.update("DELETE FROM expense WHERE id = ?", id);
 	}
 
+	/** Expenses created from a daily file remember the upload, so a replaced file replaces them. */
+	public void markSource(long expenseId, long importId)
+	{
+		jdbc.update("UPDATE expense SET source_import_id = ? WHERE id = ?", importId, expenseId);
+	}
+
+	public int deleteFromImports(List<Long> importIds)
+	{
+		int n = 0;
+		for (Long id : importIds)
+		{
+			n += jdbc.update("DELETE FROM expense WHERE source_import_id = ?", id);
+		}
+		return n;
+	}
+
 	public boolean approve(long id, String approver)
 	{
 		return jdbc.update("""

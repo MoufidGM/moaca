@@ -27,7 +27,7 @@ expense splits and activity settings.
 - **Administration** (super admin). Accounts with temporary passwords, expense categories, the
   year-mode setting and the audit log viewer. Everyone can change their own password.
 
-It works on the same database as the desktop app. Migrations V9–V22 only *add* tables and
+It works on the same database as the desktop app. Migrations V9–V23 only *add* tables and
 columns (V16 also renames three activities), and the desktop app keeps working after them.
 
 ## Try it on your Mac
@@ -81,8 +81,18 @@ Days come from Excel files, one per unit, all uploaded on **Daily logs**:
 | File | For | Who uploads | What is read |
 |---|---|---|---|
 | `DL-dd-MM-yyyy.xlsx` | The center (the sheet in use since 2025) | Reception, admins | Department totals, cash/card/cheque, drinks |
-| `TT-dd-MM-yyyy.xlsx` | Tiki Taka | Reception, restaurant manager, admins | Total sales, card, covers, note — cash is the rest |
-| `SA-dd-MM-yyyy.xlsx` | The Salon | Reception, admins | Total sales, card, clients, note — cash is the rest |
+| `TT-dd-MM-yyyy.xlsx` | Tiki Taka | Restaurant manager, reception, admins | Sales, card, the family's meals, the till's expenses, covers, note |
+| `SA-dd-MM-yyyy.xlsx` | The Salon | Reception, admins | Total sales, card, clients, note — cash is the rest. Lines carry the time, the staff member and any discount |
+
+**Tiki Taka's file** has three blocks under the summary: *Ventes* (one line per dish or drink,
+price × quantity; events as a line with the amount), *Famille / sur compte* (one line per meal
+a family member ate, name and amount) and *Dépenses payées de la caisse* (object, category,
+amount). On upload the app records the sales (cash = total − card − family), one line per
+family meal — nobody pays those, so they are neither cash nor revenue, only shown per person
+on the Tiki Taka page for the month and the year — and creates each till expense as a Tiki
+Taka expense paid from the restaurant till (waiting for approval when the manager uploads).
+A replaced file replaces its meals and expenses. A family or expense line with an amount but
+no name refuses the file, so it gets fixed rather than half-imported.
 
 **What the reception sees:** Daily logs (the three files and the expense sheets) and Expenses
 (its own entries, manual or by sheet). No totals: Today, the Salon page and everything else

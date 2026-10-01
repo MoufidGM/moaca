@@ -160,6 +160,13 @@ public class DailyLogRepository
 		return jdbc.query("SELECT * FROM daily_import ORDER BY id DESC LIMIT ?", IMPORT_MAPPER, limit);
 	}
 
+	/** Earlier successful uploads of the same unit and day (what a replacing file supersedes). */
+	public List<Long> importIdsFor(String unit, LocalDate date)
+	{
+		return jdbc.queryForList("SELECT id FROM daily_import WHERE unit = ? AND log_date = ? AND status IN ('IMPORTED', 'REPLACED')",
+				Long.class, unit, date.toString());
+	}
+
 	/** Kept files whose day falls in the range, newest day first. */
 	public List<ImportRow> storedBetween(LocalDate from, LocalDate to)
 	{

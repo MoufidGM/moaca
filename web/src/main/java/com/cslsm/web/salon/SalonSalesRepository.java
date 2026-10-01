@@ -53,12 +53,18 @@ public class SalonSalesRepository
 	/** Inserts or replaces the day's figures. */
 	public void upsert(LocalDate date, double cash, double card, Integer clients, String note, String enteredBy)
 	{
+		upsert(date, cash, card, 0, clients, note, enteredBy);
+	}
+
+	/** onAccount: the family's meals of the day at menu value (restaurant), kept apart from cash and card. */
+	public void upsert(LocalDate date, double cash, double card, double onAccount, Integer clients, String note, String enteredBy)
+	{
 		jdbc.update("""
-						INSERT INTO salon_sales (sale_date, cash, card, clients, note, entered_by, updated_at)
-						VALUES (?, ?, ?, ?, ?, ?, ?)
-						ON CONFLICT(sale_date) DO UPDATE SET cash = excluded.cash, card = excluded.card, clients = excluded.clients,
-						    note = excluded.note, entered_by = excluded.entered_by, updated_at = excluded.updated_at
-						""", date.toString(), cash, card, clients, note, enteredBy,
+						INSERT INTO salon_sales (sale_date, cash, card, on_account, clients, note, entered_by, updated_at)
+						VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+						ON CONFLICT(sale_date) DO UPDATE SET cash = excluded.cash, card = excluded.card, on_account = excluded.on_account,
+						    clients = excluded.clients, note = excluded.note, entered_by = excluded.entered_by, updated_at = excluded.updated_at
+						""", date.toString(), cash, card, onAccount, clients, note, enteredBy,
 				Instant.now().truncatedTo(ChronoUnit.SECONDS).toString());
 	}
 
