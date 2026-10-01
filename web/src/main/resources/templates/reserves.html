@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Cash & Reserves')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('reserves')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Cash &amp; Reserves</h1>
+    <span class="muted">Amounts are hidden until you press the eye.</span>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <section class="grid grid-2">
+    <!-- ===== Reception balance ===== -->
+    <article class="card">
+      <div class="card-head">
+        <h2>Reception balance <span class="muted small" th:text="'(' + ${reception.scopeLabel} + ')'">(all time)</span></h2>
+        <button th:replace="~{fragments :: eye('balance')}"></button>
+      </div>
+      <div class="big-amount" data-secret="balance"
+           th:attr="data-value=${#numbers.formatDecimal(reception.balance(), 1, 'COMMA', 0, 'POINT')}">•••••</div>
+      <table class="table breakdown">
+        <tbody>
+        <tr><td>Income from daily logs</td>
+          <td class="num" data-secret="balance" th:attr="data-value='+' + ${#numbers.formatDecimal(reception.income, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Salon cash sales</td>
+          <td class="num" data-secret="balance" th:attr="data-value='+' + ${#numbers.formatDecimal(reception.salonCash, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Deposits</td>
+          <td class="num" data-secret="balance" th:attr="data-value='+' + ${#numbers.formatDecimal(reception.deposits, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Expenses paid from the reception</td>
+          <td class="num" data-secret="balance" th:attr="data-value='−' + ${#numbers.formatDecimal(reception.expensesPaid, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Moved to the safe</td>
+          <td class="num" data-secret="balance" th:attr="data-value='−' + ${#numbers.formatDecimal(reception.movedToSafe, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Sent to bank directly</td>
+          <td class="num" data-secret="balance" th:attr="data-value='−' + ${#numbers.formatDecimal(reception.sentToBank, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Withdrawals</td>
+          <td class="num" data-secret="balance" th:attr="data-value='−' + ${#numbers.formatDecimal(reception.withdrawals, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        </tbody>
+      </table>
+      <details class="count-box">
+        <summary>Correct to the amount counted at the reception</summary>
+        <form th:action="@{/reserves/count}" method="post" class="inline-form"
+              data-confirm="Record a correction so the reception balance equals the amount counted?">
+          <input type="hidden" name="place" value="RECEPTION">
+          <label class="field"><span>Counted</span><input type="text" name="counted" inputmode="decimal" required maxlength="20"></label>
+          <label class="field grow"><span>Note (optional)</span><input type="text" name="note" maxlength="150"></label>
+          <button type="submit" class="btn btn-secondary">Correct</button>
+        </form>
+      </details>
+    </article>
+
+    <!-- ===== Safe ===== -->
+    <article class="card">
+      <div class="card-head">
+        <h2>Safe</h2>
+        <button th:replace="~{fragments :: eye('safe')}"></button>
+      </div>
+      <div class="big-amount" data-secret="safe"
+           th:attr="data-value=${#numbers.formatDecimal(safe.balance(), 1, 'COMMA', 0, 'POINT')}">•••••</div>
+      <table class="table breakdown">
+        <tbody>
+        <tr><td>Received (from reception, count corrections)</td>
+          <td class="num" data-secret="safe" th:attr="data-value='+' + ${#numbers.formatDecimal(safe.received, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Sent to bank</td>
+          <td class="num" data-secret="safe" th:attr="data-value='−' + ${#numbers.formatDecimal(safe.sentToBank, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Expenses paid from the safe</td>
+          <td class="num" data-secret="safe" th:attr="data-value='−' + ${#numbers.formatDecimal(safe.expensesPaid, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Other payments and corrections</td>
+          <td class="num" data-secret="safe" th:attr="data-value='−' + ${#numbers.formatDecimal(safe.payments, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        </tbody>
+      </table>
+      <p class="muted small">
+        Cash taken to the bank in <span th:text="${year}">2026</span> (reception + safe):
+        <span data-secret="bank" th:attr="data-value=${#numbers.formatDecimal(sentToBankThisYear, 1, 'COMMA', 0, 'POINT')}">•••••</span>
+        <button th:replace="~{fragments :: eye('bank')}"></button>
+      </p>
+      <details class="count-box">
+        <summary>Correct to the amount counted in the safe</summary>
+        <form th:action="@{/reserves/count}" method="post" class="inline-form"
+              data-confirm="Record a correction so the safe balance equals the amount counted?">
+          <input type="hidden" name="place" value="SAFE">
+          <label class="field"><span>Counted</span><input type="text" name="counted" inputmode="decimal" required maxlength="20"></label>
+          <label class="field grow"><span>Note (optional)</span><input type="text" name="note" maxlength="150"></label>
+          <button type="submit" class="btn btn-secondary">Correct</button>
+        </form>
+      </details>
+    </article>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Restaurant till (Tiki Taka) <span class="muted small" th:text="'(' + ${restaurant.scopeLabel} + ')'">(all time)</span></h2>
+      <button th:replace="~{fragments :: eye('restaurant')}"></button>
+    </div>
+    <div class="big-amount" data-secret="restaurant"
+         th:attr="data-value=${#numbers.formatDecimal(restaurant.balance(), 1, 'COMMA', 0, 'POINT')}">•••••</div>
+    <p class="muted small">Cash sales + deposits − restaurant expenses − moved to the safe − sent to bank.
+      <a th:href="@{/restaurant}">Open Tiki Taka</a> to record its sales and movements.</p>
+  </section>
+
+  <!-- ===== Bank accounts ===== -->
+  <section class="grid grid-2" id="bank">
+    <article class="card" th:each="a : ${bankAccounts}" th:with="b=${bankBalances.get(a)}">
+      <div class="card-head">
+        <h2 th:text="${a.label}">Association bank account</h2>
+        <button th:replace="~{fragments :: eye(${a.group})}"></button>
+      </div>
+      <div class="big-amount" th:attr="data-secret=${a.group},data-value=${#numbers.formatDecimal(b.balance(), 1, 'COMMA', 0, 'POINT')}">•••••</div>
+      <table class="table breakdown">
+        <tbody>
+        <tr><td th:text="${a.name() == 'ASSOCIATION'} ? 'Card and cheque payments (daily logs, Salon)' : 'Card sales'">Card and cheque</td>
+          <td class="num" th:attr="data-secret=${a.group},data-value='+' + ${#numbers.formatDecimal(b.cardAndCheque, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td th:text="${a.name() == 'ASSOCIATION'} ? 'Cash brought from the reception' : 'Cash brought from the restaurant till'">Cash brought</td>
+          <td class="num" th:attr="data-secret=${a.group},data-value='+' + ${#numbers.formatDecimal(b.cashDeposited, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr th:if="${a.name() == 'ASSOCIATION'}"><td>Cash brought from the safe</td>
+          <td class="num" th:attr="data-secret=${a.group},data-value='+' + ${#numbers.formatDecimal(b.fromSafe, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Other money in, transfers in</td>
+          <td class="num" th:attr="data-secret=${a.group},data-value='+' + ${#numbers.formatDecimal(b.otherIn, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Expenses paid from the account</td>
+          <td class="num" th:attr="data-secret=${a.group},data-value='−' + ${#numbers.formatDecimal(b.expensesPaid, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Other payments, transfers out</td>
+          <td class="num" th:attr="data-secret=${a.group},data-value='−' + ${#numbers.formatDecimal(b.otherOut, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Statement corrections</td>
+          <td class="num" th:attr="data-secret=${a.group},data-value=${#numbers.formatDecimal(b.corrections, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        </tbody>
+      </table>
+      <form th:action="@{/reserves/bank}" method="post" class="inline-form">
+        <input type="hidden" name="account" th:value="${a.name()}">
+        <label class="field grow"><span>Record</span>
+          <select name="action" required>
+            <option th:each="x : ${bankActions}" th:value="${x.name()}" th:text="${x.label}">Money in</option>
+          </select></label>
+        <label class="field"><span>Date</span><input type="date" name="date" th:value="${today}" th:attr="max=${today}" required></label>
+        <label class="field"><span>Amount</span><input type="text" name="amount" inputmode="decimal" required maxlength="20"></label>
+        <label class="field grow"><span>Note</span><input type="text" name="note" maxlength="150"></label>
+        <button type="submit" class="btn btn-secondary">Record</button>
+      </form>
+      <details class="count-box">
+        <summary>Correct to the balance on the bank statement</summary>
+        <form th:action="@{/reserves/bank/statement}" method="post" class="inline-form"
+              data-confirm="Record a correction so the account equals the statement balance?">
+          <input type="hidden" name="account" th:value="${a.name()}">
+          <label class="field"><span>Statement balance</span><input type="text" name="balance" inputmode="decimal" required maxlength="20"></label>
+          <label class="field grow"><span>Note (optional)</span><input type="text" name="note" maxlength="150" placeholder="statement date"></label>
+          <button type="submit" class="btn btn-secondary">Correct</button>
+        </form>
+      </details>
+      <table class="table" th:if="${!bankMovements.get(a).isEmpty()}">
+        <thead><tr><th>Date</th><th>Type</th><th>Note</th><th class="num">Amount</th><th></th></tr></thead>
+        <tbody>
+        <tr th:each="m : ${bankMovements.get(a)}">
+          <td class="nowrap" th:text="${#temporals.format(m.date, 'd MMM yyyy')}">1 Sep 2026</td>
+          <td th:text="${m.label}">Money in</td>
+          <td th:text="${m.note}">note</td>
+          <td class="num" th:attr="data-secret=${a.group},data-value=${#numbers.formatDecimal(m.signedAmount(), 1, 'COMMA', 0, 'POINT')}">•••••</td>
+          <td>
+            <form th:action="@{/reserves/bank/{id}/delete(id=${m.id})}" method="post" class="inline"
+                  data-confirm="Delete this movement? The balance will change accordingly.">
+              <button type="submit" class="btn-link" aria-label="Delete">✕</button>
+            </form>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+      <p class="muted small" th:if="${a.name() == 'ASSOCIATION'}">Everything but the restaurant: the daily log's card and cheque payments, the Salon's card
+        payments, cash taken to the bank, and expenses marked “Association bank account”.</p>
+      <p class="muted small" th:if="${a.name() == 'RESTAURANT'}">The restaurant's card sales, cash taken from its till to the bank, and expenses marked
+        “Tiki Taka bank account”. Salaries by transfer from this account: choose it on the payroll page.</p>
+    </article>
+  </section>
+
+  <!-- ===== Record a movement ===== -->
+  <section class="card">
+    <h2>Record a cash movement</h2>
+    <form th:action="@{/reserves/movements}" method="post" class="inline-form">
+      <label class="field grow">
+        <span>What happened</span>
+        <select name="action" required>
+          <option th:each="a : ${actions}" th:value="${a.name()}" th:text="${a.label}">Move cash</option>
+        </select>
+      </label>
+      <label class="field"><span>Date</span><input type="date" name="date" th:value="${today}" th:attr="max=${today}" required></label>
+      <label class="field"><span>Amount</span><input type="text" name="amount" inputmode="decimal" required maxlength="20"></label>
+      <label class="field grow"><span>Note (optional)</span><input type="text" name="note" maxlength="150" placeholder="e.g. bordereau n°, who carried it"></label>
+      <button type="submit" class="btn btn-primary">Record</button>
+    </form>
+    <p class="muted small">Expenses (purchases, salaries, bills) go on the Expenses page, with “money came from: safe” when paid from the safe.</p>
+  </section>
+
+  <section class="grid grid-2">
+    <article class="card">
+      <h2>Reception movements</h2>
+      <p class="muted" th:if="${receptionMovements.isEmpty()}">None recorded.</p>
+      <table class="table" th:if="${!receptionMovements.isEmpty()}">
+        <thead><tr><th>Date</th><th>Type</th><th>Note</th><th class="num">Amount</th><th></th></tr></thead>
+        <tbody>
+        <tr th:each="m : ${receptionMovements}">
+          <td class="nowrap" th:text="${#temporals.format(m.date, 'd MMM yyyy')}">1 Sep 2026</td>
+          <td th:text="${m.label}">Deposit</td>
+          <td th:text="${m.note}">note</td>
+          <td class="num" data-secret="balance"
+              th:attr="data-value=${#numbers.formatDecimal(m.signedAmount(), 1, 'COMMA', 0, 'POINT')}">•••••</td>
+          <td>
+            <form th:action="@{/reserves/movements/{t}/{id}/delete(t=${m.table},id=${m.id})}" method="post" class="inline"
+                  data-confirm="Delete this movement? The balance will change accordingly.">
+              <button type="submit" class="btn-link" aria-label="Delete">✕</button>
+            </form>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </article>
+    <article class="card">
+      <h2>Safe movements</h2>
+      <p class="muted" th:if="${safeMovements.isEmpty()}">None recorded.</p>
+      <table class="table" th:if="${!safeMovements.isEmpty()}">
+        <thead><tr><th>Date</th><th>Type</th><th>Note</th><th class="num">Amount</th><th></th></tr></thead>
+        <tbody>
+        <tr th:each="m : ${safeMovements}">
+          <td class="nowrap" th:text="${#temporals.format(m.date, 'd MMM yyyy')}">1 Sep 2026</td>
+          <td th:text="${m.label}">From reception</td>
+          <td th:text="${m.note}">note</td>
+          <td class="num" data-secret="safe"
+              th:attr="data-value=${#numbers.formatDecimal(m.signedAmount(), 1, 'COMMA', 0, 'POINT')}">•••••</td>
+          <td>
+            <form th:action="@{/reserves/movements/{t}/{id}/delete(t=${m.table},id=${m.id})}" method="post" class="inline"
+                  data-confirm="Delete this movement? The balance will change accordingly.">
+              <button type="submit" class="btn-link" aria-label="Delete">✕</button>
+            </form>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </article>
+  </section>
+</main>
+</body>
+</html>

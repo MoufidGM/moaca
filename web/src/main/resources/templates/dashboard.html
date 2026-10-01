@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Dashboard')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('dashboard')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Dashboard</h1>
+    <span class="muted" th:text="${view.periodLabel} + ' · ' + ${view.compareLabel}">1–29 Sep · vs 1–29 Aug</span>
+  </div>
+
+  <!-- ===== Profit this month ===== -->
+  <section class="grid grid-3">
+    <article class="card stat">
+      <div class="stat-label">Income</div>
+      <div class="stat-value" th:text="${#numbers.formatDecimal(view.income, 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub" th:if="${view.incomeDelta != null}">
+        <span class="delta" th:classappend="${view.incomeDelta.css}" th:text="${view.incomeDelta.text}">+0%</span>
+        <span th:text="${view.compareLabel}">vs</span>
+      </div>
+    </article>
+    <article class="card stat">
+      <div class="stat-label">Expenses</div>
+      <div class="stat-value" th:text="${#numbers.formatDecimal(view.expenses, 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub" th:if="${view.expensesDelta != null}">
+        <span class="delta" th:classappend="${view.expensesDelta.css}" th:text="${view.expensesDelta.text}">+0%</span>
+        <span th:text="${view.compareLabel}">vs</span>
+      </div>
+    </article>
+    <article class="card stat stat-main">
+      <div class="stat-label">Net profit</div>
+      <div class="stat-value" th:classappend="${view.net < 0} ? 'negative' : 'positive'"
+           th:text="${#numbers.formatDecimal(view.net, 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub" th:if="${view.netDelta != null}">
+        <span class="delta" th:classappend="${view.netDelta.css}" th:text="${view.netDelta.text}">+0%</span>
+        <span th:text="${view.compareLabel}">vs</span>
+      </div>
+    </article>
+  </section>
+
+  <!-- ===== Where the cash is (hidden by default) ===== -->
+  <section class="grid grid-3">
+    <article class="card stat">
+      <div class="stat-label">Reception balance
+        <button th:replace="~{fragments :: eye('balance')}"></button>
+      </div>
+      <div class="stat-value" data-secret="balance"
+           th:attr="data-value=${#numbers.formatDecimal(view.reception.balance(), 1, 'COMMA', 0, 'POINT')}">•••••</div>
+      <div class="stat-sub" th:text="${view.reception.scopeLabel}">all time</div>
+    </article>
+    <article class="card stat">
+      <div class="stat-label">Safe
+        <button th:replace="~{fragments :: eye('safe')}"></button>
+      </div>
+      <div class="stat-value" data-secret="safe"
+           th:attr="data-value=${#numbers.formatDecimal(view.safe.balance(), 1, 'COMMA', 0, 'POINT')}">•••••</div>
+      <div class="stat-sub">physical cash in the safe</div>
+    </article>
+    <article class="card stat">
+      <div class="stat-label">Association bank account
+        <button th:replace="~{fragments :: eye('bank')}"></button>
+      </div>
+      <div class="stat-value" data-secret="bank"
+           th:attr="data-value=${#numbers.formatDecimal(view.associationBank.balance(), 1, 'COMMA', 0, 'POINT')}">•••••</div>
+      <div class="stat-sub">Tiki Taka account:
+        <span data-secret="bank" th:attr="data-value=${#numbers.formatDecimal(view.restaurantBank.balance(), 1, 'COMMA', 0, 'POINT')}">•••••</span>
+      </div>
+    </article>
+  </section>
+
+  <!-- ===== Needs attention ===== -->
+  <section class="card attention" th:if="${view.hasAttentionItems()}">
+    <h2>Needs attention</h2>
+    <ul class="attention-links">
+      <li th:if="${view.pendingExpenses.count() > 0}">
+        <a th:href="@{/expenses(status='PENDING')}"
+           th:text="${view.pendingExpenses.count()} + ' expense(s) waiting for approval ('
+                    + ${#numbers.formatDecimal(view.pendingExpenses.amount(), 1, 'COMMA', 0, 'POINT')} + ')'">pending</a>
+        <span class="muted small">— already counted in the figures above until rejected</span>
+      </li>
+      <li th:if="${view.suspectedBankDeposits.count() > 0}">
+        <a th:href="@{/expenses(suspects=true)}"
+           th:text="${view.suspectedBankDeposits.count()} + ' expense(s) look like bank deposits ('
+                    + ${#numbers.formatDecimal(view.suspectedBankDeposits.amount(), 1, 'COMMA', 0, 'POINT')} + ')'">suspects</a>
+        <span class="muted small">— they lower the profit until moved to bank deposits</span>
+      </li>
+      <li th:if="${view.importsNeedingReview > 0}">
+        <a th:href="@{/daily-logs}" th:text="${view.importsNeedingReview} + ' daily log(s) imported with warnings'">warnings</a>
+      </li>
+    </ul>
+    <div th:if="${!view.missingDays.isEmpty()}">
+      <p>
+        <strong th:text="${view.missingDays.size()} + ' day(s) without a log file'">2 days</strong>
+        in the last 30 days — income for these days is not counted:
+      </p>
+      <ul class="chips">
+        <li th:each="d : ${view.missingDays}" th:text="${#temporals.format(d, 'EEE d MMM')}">Mon 1 Sep</li>
+      </ul>
+      <p class="muted small">Days the center was closed also appear here.</p>
+    </div>
+    <div th:if="${!view.futureExpenses.isEmpty()}">
+      <p><strong th:text="${view.futureExpenses.size()} + ' expense(s) dated in the future'">1 expense</strong>
+        — usually a typo in the year. They are left out of this month's figures:</p>
+      <table class="table">
+        <tbody>
+        <tr th:each="e : ${view.futureExpenses}">
+          <td th:text="${e.date}">2028-06-10</td>
+          <td th:text="${e.category}">Salaries</td>
+          <td th:text="${e.description}">description</td>
+          <td class="num" th:text="${#numbers.formatDecimal(e.amount, 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== 12 months ===== -->
+  <section class="card">
+    <h2>Last 12 months</h2>
+    <div class="chart-box" th:utext="${view.chartSvg}"></div>
+  </section>
+
+  <!-- ===== This month in detail ===== -->
+  <section class="grid grid-3">
+    <article class="card">
+      <h2>Activities this month</h2>
+      <table class="table">
+        <thead><tr><th></th><th class="num">Revenue</th><th class="num">Profit</th></tr></thead>
+        <tbody>
+        <tr th:each="r : ${activities.revenueRows}" th:if="${r.revenue != 0 or r.costs != 0}">
+          <td><a th:href="@{/activities/detail(name=${r.name},period='month')}" th:text="${r.name}">Terrain</a></td>
+          <td class="num" th:text="${#numbers.formatDecimal(r.revenue, 1, 'COMMA', 0, 'POINT')}">0</td>
+          <td class="num" th:classappend="${r.profit < 0} ? 'negative'"
+              th:text="${#numbers.formatDecimal(r.profit, 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tbody>
+      </table>
+      <p class="small"><a th:href="@{/activities(period='month')}">Full analysis by activity →</a></p>
+    </article>
+    <article class="card">
+      <h2>Top expenses</h2>
+      <p class="muted" th:if="${view.topExpenseCategories.isEmpty()}">No expenses recorded this month yet.</p>
+      <table class="table" th:if="${!view.topExpenseCategories.isEmpty()}">
+        <tbody>
+        <tr th:each="c : ${view.topExpenseCategories}">
+          <td th:text="${c.name}">Category</td>
+          <td class="num" th:text="${#numbers.formatDecimal(c.amount, 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tbody>
+      </table>
+    </article>
+    <article class="card">
+      <h2>How customers paid</h2>
+      <table class="table">
+        <tbody>
+        <tr th:each="p : ${view.paymentMix}">
+          <td th:text="${p.name}">Cash</td>
+          <td class="num" th:text="${#numbers.formatDecimal(p.amount, 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tbody>
+      </table>
+    </article>
+  </section>
+</main>
+</body>
+</html>

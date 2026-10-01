@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments :: head('Daily logs')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('daily-logs')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Daily logs</h1>
+    <span class="muted">Upload each day's file as soon as the day is closed.</span>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <!-- Results of the last upload -->
+  <section class="card" th:if="${outcomes != null}">
+    <h2>Upload results</h2>
+    <table class="table">
+      <tbody>
+      <tr th:each="o : ${outcomes}" th:classappend="${o.imported()} ? (${o.warnings().isEmpty()} ? 'row-ok' : 'row-warn') : 'row-error'">
+        <td class="nowrap" th:text="${o.fileName()}">DL-01-09-2026.xlsx</td>
+        <td>
+          <strong th:text="${o.imported()} ? (${o.replaced()} ? 'Replaced' : 'Imported') : 'Refused'">Imported</strong>
+          — <span th:text="${o.message()}">message</span>
+          <ul class="warn-list" th:if="${!o.warnings().isEmpty()}">
+            <li th:each="w : ${o.warnings()}" th:text="${w}">warning</li>
+          </ul>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="grid grid-2">
+    <article class="card">
+      <h2>Upload</h2>
+      <table class="table files-table">
+        <tbody>
+        <tr th:if="${canCenter}"><td><strong>DL-</strong>dd-MM-yyyy.xlsx</td><td>The center's daily log (departments, payments, drinks)</td><td></td></tr>
+        <tr th:if="${canRestaurant}"><td><strong>TT-</strong>dd-MM-yyyy.xlsx</td><td>Tiki Taka's day</td>
+          <td><a th:href="@{/daily-logs/template/restaurant}">Template</a></td></tr>
+        <tr th:if="${canCenter}"><td><strong>SA-</strong>dd-MM-yyyy.xlsx</td><td>The Salon's day</td>
+          <td><a th:href="@{/daily-logs/template/salon}">Template</a></td></tr>
+        </tbody>
+      </table>
+      <form th:action="@{/daily-logs}" method="post" enctype="multipart/form-data" class="upload-form">
+        <label class="field">
+          <span>Files (you can select several)</span>
+          <input type="file" name="files" accept=".xlsx,.xls" multiple required data-max-mb="10">
+        </label>
+        <label class="check" sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')">
+          <input type="checkbox" name="replace" value="true">
+          <span>Replace days already imported (use after a file was corrected)</span>
+        </label>
+        <button type="submit" class="btn btn-primary">Upload</button>
+      </form>
+    </article>
+
+    <article class="card" th:if="${canCenter}">
+      <h2>Missing in the last 14 days (center)</h2>
+      <p class="muted" th:if="${missingDays.isEmpty()}">Every day has a file. 👍</p>
+      <ul class="chips" th:if="${!missingDays.isEmpty()}">
+        <li th:each="d : ${missingDays}" th:text="${#temporals.format(d, 'EEE d MMM')}">Mon 1 Sep</li>
+      </ul>
+      <p class="muted small" th:if="${!missingDays.isEmpty()}">Days the center was closed also appear here.</p>
+    </article>
+  </section>
+
+  <section class="card">
+    <h2>Recent uploads</h2>
+    <p class="muted" th:if="${imports.isEmpty()}">Nothing uploaded through the web app yet.</p>
+    <table class="table" th:if="${!imports.isEmpty()}">
+      <thead>
+      <tr><th>Day</th><th>File</th><th>For</th><th>Result</th><th class="num">Total</th><th>By</th><th>When</th><th></th></tr>
+      </thead>
+      <tbody>
+      <tr th:each="i : ${imports}" th:classappend="${i.status() == 'REJECTED'} ? 'row-error' : (${i.needsReview()} ? 'row-warn' : '')">
+        <td class="nowrap" th:text="${i.logDate() != null} ? ${#temporals.format(i.logDate(), 'EEE d MMM yyyy')} : '—'">Mon 1 Sep</td>
+        <td th:text="${i.originalName()}">DL.xlsx</td>
+        <td th:text="${i.unitLabel()}">Center</td>
+        <td>
+          <span th:switch="${i.status()}">
+            <span th:case="'IMPORTED'">Imported</span>
+            <span th:case="'REPLACED'">Replaced</span>
+            <span th:case="*">Refused</span>
+          </span>
+          <span class="muted small" th:if="${i.message() != null}" th:text="'— ' + ${i.message()}"></span>
+          <ul class="warn-list" th:if="${i.hasWarnings()}">
+            <li th:each="w : ${i.warnings()}" th:text="${w}">warning</li>
+          </ul>
+          <span class="muted small" th:if="${i.reviewedBy() != null}" th:text="'Checked by ' + ${i.reviewedBy()}"></span>
+        </td>
+        <td class="num" th:text="${i.totalTtc() != null} ? ${#numbers.formatDecimal(i.totalTtc(), 1, 'COMMA', 0, 'POINT')} : ''">0</td>
+        <td th:text="${i.uploadedBy()}">desk</td>
+        <td class="nowrap small" th:text="${i.uploadedLocal()}">2026-09-30 10:00</td>
+        <td class="nowrap actions" sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')">
+          <a th:if="${i.storedName() != null}" th:href="@{/daily-logs/{id}/file(id=${i.id()})}">File</a>
+          <form th:if="${i.needsReview()}" th:action="@{/daily-logs/{id}/reviewed(id=${i.id()})}" method="post" class="inline">
+            <button type="submit" class="btn-link">Mark checked</button>
+          </form>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

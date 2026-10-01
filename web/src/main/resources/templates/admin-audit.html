@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Audit log')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('admin')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Audit log</h1>
+    <span class="muted" th:text="${total} + ' entr' + (${total == 1} ? 'y' : 'ies')">0 entries</span>
+    <a class="btn-link" th:href="@{/admin}">Back to Administration</a>
+  </div>
+
+  <form class="card filters" th:action="@{/admin/audit}" method="get">
+    <div class="filter-row">
+      <label>From <input type="date" name="from" th:value="${from}"></label>
+      <label>To <input type="date" name="to" th:value="${to}"></label>
+      <label>User
+        <select name="user">
+          <option value="">All</option>
+          <option th:each="u : ${usernames}" th:value="${u}" th:text="${u}" th:selected="${u == user}">mo</option>
+        </select>
+      </label>
+      <label>Action
+        <select name="action">
+          <option value="">All</option>
+          <option th:each="a : ${actions}" th:value="${a}" th:text="${a}" th:selected="${a == action}">LOGIN</option>
+        </select>
+      </label>
+      <label class="grow">Text <input type="text" name="q" th:value="${q}" maxlength="80" placeholder="details, entity, id"></label>
+      <button type="submit" class="btn btn-secondary">Filter</button>
+      <a class="btn-link" th:href="@{/admin/audit}">Clear</a>
+    </div>
+  </form>
+
+  <section class="card">
+    <p class="muted" th:if="${entries.isEmpty()}">No entries match.</p>
+    <table class="table audit" th:if="${!entries.isEmpty()}">
+      <thead>
+      <tr><th>When</th><th>Who</th><th>Action</th><th>What</th><th>Details</th><th>From</th></tr>
+      </thead>
+      <tbody>
+      <tr th:each="e : ${entries}" th:classappend="${e.isAlert()} ? 'row-warn'">
+        <td class="nowrap" th:text="${e.atLocal()}">Tue 29 Sep 2026 10:15:00</td>
+        <td th:text="${e.username()}">mo</td>
+        <td><code th:text="${e.action()}">EXPENSE_CREATE</code></td>
+        <td class="muted" th:text="${e.entity() != null} ? ${e.entity()} + (${e.entityId() != null} ? ' #' + ${e.entityId()} : '') : ''">expense #12</td>
+        <td class="multiline" th:text="${e.details()}">details</td>
+        <td class="muted small" th:text="${e.clientIp()}">10.120.0.2</td>
+      </tr>
+      </tbody>
+    </table>
+    <nav class="pager" th:if="${pages > 1}" aria-label="Pages">
+      <a class="btn btn-secondary" th:if="${page > 1}" th:href="@{/admin/audit(from=${from},to=${to},user=${user},action=${action},q=${q},page=${page - 1})}">‹ Newer</a>
+      <span class="muted" th:text="'Page ' + ${page} + ' of ' + ${pages}">Page 1 of 3</span>
+      <a class="btn btn-secondary" th:if="${page < pages}" th:href="@{/admin/audit(from=${from},to=${to},user=${user},action=${action},q=${q},page=${page + 1})}">Older ›</a>
+    </nav>
+    <p class="muted small">Entries can never be edited or deleted, not even by the super admin: the database refuses it.</p>
+  </section>
+</main>
+</body>
+</html>

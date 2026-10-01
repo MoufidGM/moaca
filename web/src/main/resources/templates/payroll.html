@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Payroll')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('employees')}"></header>
+
+<main class="page page-narrow">
+  <div class="page-head">
+    <h1>Payroll</h1>
+    <a class="btn-link" th:href="@{/employees}">Staff</a>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <section class="card filters">
+    <div class="filter-row">
+      <a class="btn btn-secondary" th:href="@{/payroll(month=${prevMonth})}" aria-label="Previous month">‹</a>
+      <strong th:text="${monthLabel}">September 2026</strong>
+      <a class="btn btn-secondary" th:href="@{/payroll(month=${nextMonth})}" aria-label="Next month">›</a>
+    </div>
+  </section>
+
+  <form class="card" th:action="@{/payroll}" method="post" data-confirm="Record these salaries as approved expenses?">
+    <input type="hidden" name="month" th:value="${month}">
+    <p class="muted">Amounts are prefilled from each employee's monthly salary. Clear a line to skip it. Employees
+      already paid this month are shown but not recorded again.</p>
+    <p class="muted" th:if="${lines.isEmpty()}">No active employees. <a th:href="@{/employees/new}">Add one</a>.</p>
+    <table class="table" th:if="${!lines.isEmpty()}">
+      <thead><tr><th>Employee</th><th>Pay counts for</th><th class="num">Already recorded</th><th class="num">Salary</th></tr></thead>
+      <tbody>
+      <tr th:each="l : ${lines}" th:classappend="${l.alreadyPaid() > 0} ? 'row-muted'">
+        <td>
+          <input type="hidden" name="employeeId" th:value="${l.employee().id()}">
+          <span th:text="${l.employee().name()}">Name</span>
+          <span class="muted small" th:if="${l.employee().job() != null}" th:text="'· ' + ${l.employee().job()}">job</span>
+        </td>
+        <td th:text="${l.employee().splitLabel()}">Académie</td>
+        <td class="num" th:text="${l.alreadyPaid() > 0} ? ${#numbers.formatDecimal(l.alreadyPaid(), 1, 'COMMA', 0, 'POINT')} : ''">0</td>
+        <td class="num"><input type="text" name="amount" inputmode="decimal" th:value="${l.amount()}" class="amount-input"
+                               th:readonly="${l.alreadyPaid() > 0}" aria-label="Salary"></td>
+      </tr>
+      </tbody>
+    </table>
+    <div class="form-actions" th:if="${!lines.isEmpty()}">
+      <label class="field"><span>Paid from</span>
+        <select name="paidFrom">
+          <option value="BANK">Association bank account (transfer)</option>
+          <option value="RESTAURANT_BANK">Tiki Taka bank account (transfer)</option>
+          <option value="SAFE">Safe (cash)</option>
+          <option value="RECEPTION">Reception till (cash)</option>
+        </select>
+      </label>
+      <button type="submit" class="btn btn-primary">Record salaries</button>
+    </div>
+  </form>
+</main>
+</body>
+</html>

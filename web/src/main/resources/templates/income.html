@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Income')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('income')}"></header>
+
+<main class="page" th:with="p=${view.period}">
+  <div class="page-head">
+    <h1>Income</h1>
+    <span class="muted" th:text="${p.label()}">September 2026</span>
+    <span class="tag" th:if="${p.running()}">in progress</span>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <!-- ===== Period ===== -->
+  <section class="card filters">
+    <div class="filter-row">
+      <nav class="seg" aria-label="Period">
+        <a th:each="u : ${units}" th:if="${u.name() != 'CUSTOM'}"
+           th:href="@{/income(unit=${u.key},date=${p.to()},compare=${view.compare})}" th:text="${u.label}"
+           th:classappend="${p.unit() == u} ? 'active'">Month</a>
+      </nav>
+      <span th:unless="${p.isCustom()}" class="actions">
+        <a class="btn btn-secondary" th:href="@{/income(unit=${p.unit().key},date=${p.prevAnchor()},compare=${view.compare})}"
+           th:attr="aria-label='Previous ' + ${p.unit().label}">‹</a>
+        <a class="btn btn-secondary" th:if="${p.nextAnchor() != null}"
+           th:href="@{/income(unit=${p.unit().key},date=${p.nextAnchor()},compare=${view.compare})}"
+           th:attr="aria-label='Next ' + ${p.unit().label}">›</a>
+        <span class="btn btn-secondary disabled" th:if="${p.nextAnchor() == null}" aria-hidden="true">›</span>
+      </span>
+      <form th:action="@{/income}" method="get" class="inline-form" th:unless="${p.isCustom()}">
+        <input type="hidden" name="unit" th:value="${p.unit().key}">
+        <input type="hidden" name="compare" th:value="${view.compare}">
+        <label>Go to <input type="date" name="date" th:value="${p.to()}" th:max="${today}"></label>
+        <button type="submit" class="btn btn-secondary">Show</button>
+      </form>
+    </div>
+    <div class="filter-row">
+      <form th:action="@{/income}" method="get" class="inline-form">
+        <input type="hidden" name="unit" value="custom">
+        <input type="hidden" name="compare" th:value="${view.compare}">
+        <label>From <input type="date" name="from" th:value="${p.isCustom()} ? ${p.from()} : ''" th:max="${today}"></label>
+        <label>To <input type="date" name="to" th:value="${p.isCustom()} ? ${p.end()} : ''" th:max="${today}"></label>
+        <button type="submit" class="btn btn-secondary">Custom range</button>
+      </form>
+      <a class="btn" th:classappend="${view.compare} ? 'btn-primary' : 'btn-secondary'"
+         th:href="${p.isCustom()} ? @{/income(unit='custom',from=${p.from()},to=${p.end()},compare=${!view.compare})}
+                                  : @{/income(unit=${p.unit().key},date=${p.to()},compare=${!view.compare})}"
+         th:text="${view.compare} ? 'Comparing ' + ${p.compareLabel()} : 'Compare with previous period'">Compare</a>
+    </div>
+  </section>
+
+  <!-- ===== Totals ===== -->
+  <section class="grid grid-3">
+    <article class="card stat stat-main">
+      <div class="stat-label">Income</div>
+      <div class="stat-value" th:text="${#numbers.formatDecimal(view.total, 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub" th:if="${view.delta != null}">
+        <span class="delta" th:classappend="${view.delta.css}" th:text="${view.delta.text}">+0%</span>
+        <span th:text="${p.compareLabel()} + ' (' + ${#numbers.formatDecimal(view.previousTotal, 1, 'COMMA', 0, 'POINT')} + ')'">vs</span>
+      </div>
+      <div class="stat-sub" th:if="${view.delta == null}">departments, drinks and Tiki Taka</div>
+    </article>
+    <article class="card stat">
+      <div class="stat-label">Per day</div>
+      <div class="stat-value" th:text="${#numbers.formatDecimal(view.dailyAverage, 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub" th:text="'average over ' + ${view.daysLogged} + ' day(s) with a log file'">days</div>
+    </article>
+    <article class="card stat">
+      <div class="stat-label">Best day</div>
+      <div class="stat-value" th:text="${view.bestDay != null} ? ${#numbers.formatDecimal(view.bestDay.amount(), 1, 'COMMA', 0, 'POINT')} : '—'">0</div>
+      <div class="stat-sub" th:text="${view.bestDay != null} ? ${view.bestDay.title()} : 'no log file in this period'">day</div>
+    </article>
+  </section>
+
+  <section class="card attention" th:if="${view.missingCount > 0}">
+    <p><strong th:text="${view.missingCount} + ' day(s) without a log file'">2 days</strong>
+      in this period — their income is not counted:</p>
+    <ul class="chips" th:if="${!view.missingDays.isEmpty()}">
+      <li th:each="d : ${view.missingDays}" th:text="${#temporals.format(d, 'EEE d MMM')}">Mon 1 Sep</li>
+    </ul>
+    <p class="muted small">Days the center was closed also appear here. Upload the missing files on <a th:href="@{/daily-logs}">Daily logs</a>.</p>
+  </section>
+
+  <!-- ===== Chart ===== -->
+  <section class="card">
+    <h2 th:text="${view.monthly} ? 'Income per month' : 'Income per day'">Income per day</h2>
+    <div class="chart-box" th:utext="${view.chartSvg}"></div>
+  </section>
+
+  <!-- ===== Breakdown ===== -->
+  <section class="grid grid-2">
+    <article class="card">
+      <h2>By activity</h2>
+      <p class="muted" th:if="${view.activities.isEmpty()}">Nothing recorded in this period.</p>
+      <table class="table" th:if="${!view.activities.isEmpty()}">
+        <thead>
+        <tr>
+          <th>Activity</th>
+          <th class="num">Income</th>
+          <th class="num">Share</th>
+          <th class="num" th:if="${view.compare}">Previous</th>
+          <th class="num" th:if="${view.compare}">Change</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="a : ${view.activities}">
+          <td><a th:href="@{/activities/detail(name=${a.name()},period='custom',from=${p.from()},to=${p.to()})}" th:text="${a.name()}">Padel</a></td>
+          <td class="num" th:text="${#numbers.formatDecimal(a.amount(), 1, 'COMMA', 0, 'POINT')}">0</td>
+          <td class="num" th:text="${#numbers.formatPercent(a.share(), 1, 0)}">0%</td>
+          <td class="num" th:if="${view.compare}" th:text="${#numbers.formatDecimal(a.previous(), 1, 'COMMA', 0, 'POINT')}">0</td>
+          <td class="num" th:if="${view.compare}">
+            <span class="delta" th:if="${a.delta() != null}" th:classappend="${a.delta().css}" th:text="${a.delta().text}">+0%</span>
+            <span class="muted" th:if="${a.delta() == null}">new</span>
+          </td>
+        </tr>
+        </tbody>
+        <tfoot>
+        <tr>
+          <td>Total</td>
+          <td class="num" th:text="${#numbers.formatDecimal(view.total, 1, 'COMMA', 0, 'POINT')}">0</td>
+          <td class="num">100%</td>
+          <td class="num" th:if="${view.compare}" th:text="${#numbers.formatDecimal(view.previousTotal, 1, 'COMMA', 0, 'POINT')}">0</td>
+          <td th:if="${view.compare}"></td>
+        </tr>
+        </tfoot>
+      </table>
+    </article>
+    <article class="card">
+      <h2>How customers paid</h2>
+      <table class="table">
+        <thead>
+        <tr>
+          <th>Method</th>
+          <th class="num">Amount</th>
+          <th class="num">Share</th>
+          <th class="num" th:if="${view.compare}">Previous</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="m : ${view.payments}">
+          <td th:text="${m.name()}">Cash</td>
+          <td class="num" th:text="${#numbers.formatDecimal(m.amount(), 1, 'COMMA', 0, 'POINT')}">0</td>
+          <td class="num" th:text="${#numbers.formatPercent(m.share(), 1, 0)}">0%</td>
+          <td class="num" th:if="${view.compare}" th:text="${#numbers.formatDecimal(m.previous(), 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tbody>
+      </table>
+      <p class="muted small">Cash, card and cheque come from the daily log's payment lines; drinks are paid in cash at the bar.
+        Tiki Taka's sales are entered on <a th:href="@{/restaurant}">its own page</a> and go into its own till.</p>
+    </article>
+  </section>
+
+  <!-- ===== Day by day / month by month ===== -->
+  <section class="card">
+    <h2 th:text="${view.monthly} ? 'Month by month' : 'Day by day'">Day by day</h2>
+    <table class="table">
+      <thead>
+      <tr>
+        <th th:text="${view.monthly} ? 'Month' : 'Day'">Day</th>
+        <th class="num">Income</th>
+        <th class="num" th:if="${view.compare}" th:text="${p.compareLabel()}">Previous</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr th:each="b : ${view.buckets}" th:classappend="${b.missing()} ? 'row-missing'">
+        <td>
+          <a th:unless="${view.monthly}" th:href="@{/income(unit='day',date=${b.date()},compare=${view.compare})}" th:text="${b.title()}">Tue 12 Sep 2026</a>
+          <a th:if="${view.monthly}" th:href="@{/income(unit='month',date=${b.date()},compare=${view.compare})}" th:text="${b.title()}">Sep 2026</a>
+        </td>
+        <td class="num">
+          <span th:if="${b.amount() != null}" th:text="${#numbers.formatDecimal(b.amount(), 1, 'COMMA', 0, 'POINT')}">0</span>
+          <span class="missing-label" th:if="${b.amount() == null and b.missing()}">no log file</span>
+          <span class="muted" th:if="${b.amount() == null and !b.missing()}">—</span>
+        </td>
+        <td class="num" th:if="${view.compare}"
+            th:text="${b.previous() != null} ? ${#numbers.formatDecimal(b.previous(), 1, 'COMMA', 0, 'POINT')} : '—'">0</td>
+      </tr>
+      </tbody>
+      <tfoot>
+      <tr>
+        <td>Total</td>
+        <td class="num" th:text="${#numbers.formatDecimal(view.total, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:if="${view.compare}" th:text="${#numbers.formatDecimal(view.previousTotal, 1, 'COMMA', 0, 'POINT')}">0</td>
+      </tr>
+      </tfoot>
+    </table>
+  </section>
+</main>
+</body>
+</html>

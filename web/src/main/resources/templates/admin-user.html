@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${pageTitle})}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('admin')}"></header>
+
+<main class="page page-narrow">
+  <div class="page-head">
+    <h1 th:text="${pageTitle}">New account</h1>
+    <a class="btn-link" th:href="@{/admin}">Back to Administration</a>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+  <p class="alert alert-error" th:if="${error != null}" th:text="${error}">Problem</p>
+
+  <!-- ===== Who and what role ===== -->
+  <form class="card form" method="post" autocomplete="off"
+        th:action="${existing == null} ? @{/admin/users/new} : @{/admin/users/{id}(id=${existing.id()})}">
+    <div class="form-grid">
+      <label class="field" th:if="${existing == null}"><span>Username (used to sign in)</span>
+        <input type="text" name="username" th:value="${in.username()}" required maxlength="32" pattern="[A-Za-z0-9._-]{3,32}"
+               autocapitalize="none" spellcheck="false" autocomplete="off"></label>
+      <div class="field" th:if="${existing != null}"><span>Username</span>
+        <p class="rule-fixed" th:text="${existing.username()}">mo</p></div>
+      <label class="field"><span>Name shown in the app</span>
+        <input type="text" name="displayName" th:value="${in.displayName()}" maxlength="60" autocomplete="off"></label>
+      <label class="field" th:unless="${self}"><span>Role</span>
+        <select name="role">
+          <option th:each="r : ${roles}" th:value="${r.name()}" th:text="${r.label()}" th:selected="${r.name() == in.role()}">Receptionist</option>
+        </select></label>
+      <div class="field" th:if="${self}"><span>Role</span>
+        <p class="rule-fixed" th:text="${existing.role().label()}">Super admin</p>
+        <input type="hidden" name="role" th:value="${existing.role().name()}">
+        <input type="hidden" name="enabled" value="true"></div>
+      <label class="check" th:if="${existing != null and !self}">
+        <input type="checkbox" name="enabled" value="true" th:checked="${in.enabled()}"><span>Can sign in</span>
+      </label>
+    </div>
+    <div th:if="${existing == null}">
+      <h2>Temporary password</h2>
+      <p class="muted small">At least 12 characters. The person replaces it at their first sign-in, so only they will know
+        their password afterwards.</p>
+      <div class="form-grid">
+        <label class="field"><span>Password</span>
+          <input type="password" name="password" required minlength="12" maxlength="200" autocomplete="new-password"></label>
+        <label class="field"><span>Repeat</span>
+          <input type="password" name="repeat" required minlength="12" maxlength="200" autocomplete="new-password"></label>
+      </div>
+    </div>
+    <p class="muted small">Receptionists enter expenses and upload daily logs. The restaurant manager sees only Tiki Taka and
+      Expenses. Admins see the money: dashboard, income, reports, cash and reserves. Super admins also manage accounts and settings.
+      Admins and super admins sign in with an authenticator code as well.</p>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary" th:text="${existing == null} ? 'Create account' : 'Save'">Save</button>
+    </div>
+  </form>
+
+  <!-- ===== Recovery actions ===== -->
+  <section class="grid grid-2" th:if="${existing != null}">
+    <article class="card">
+      <h2>State</h2>
+      <dl class="details">
+        <dt>Signs in</dt><dd th:text="${existing.enabled()} ? 'yes' : 'no — switched off'">yes</dd>
+        <dt>Locked</dt><dd th:text="${existing.isLocked(now)} ? 'yes, after too many wrong attempts' : 'no'">no</dd>
+        <dt>Two-factor</dt><dd th:text="${existing.totpEnabled()} ? 'enrolled' : (${existing.role().requiresTwoFactor()} ? 'to enroll at next sign-in' : 'not used')">enrolled</dd>
+        <dt>Password</dt><dd th:text="${existing.passwordChangeRequired()} ? 'temporary — to be replaced at next sign-in' : 'chosen by the person'">own</dd>
+        <dt>Created</dt><dd class="muted" th:text="${#strings.substring(existing.createdAt(), 0, 16)} + ' UTC'">2026-01-01</dd>
+        <dt>Last sign-in</dt><dd class="muted" th:text="${existing.lastLoginAt() != null} ? ${#strings.replace(#strings.substring(existing.lastLoginAt(), 0, 16), 'T', ' ')} + ' UTC' : 'never'">never</dd>
+      </dl>
+      <form th:if="${existing.isLocked(now)}" th:action="@{/admin/users/{id}/unlock(id=${existing.id()})}" method="post" class="form-actions">
+        <button type="submit" class="btn btn-secondary">Unlock now</button>
+        <span class="muted small">otherwise the lock ends by itself after 15 minutes</span>
+      </form>
+    </article>
+    <article class="card" th:unless="${self}">
+      <h2>Forgotten password</h2>
+      <form th:action="@{/admin/users/{id}/password(id=${existing.id()})}" method="post" autocomplete="off">
+        <label class="field"><span>Temporary password (at least 12 characters)</span>
+          <input type="password" name="password" required minlength="12" maxlength="200" autocomplete="new-password"></label>
+        <label class="field"><span>Repeat</span>
+          <input type="password" name="repeat" required minlength="12" maxlength="200" autocomplete="new-password"></label>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-secondary">Set temporary password</button>
+        </div>
+      </form>
+      <h2 class="spaced">Lost phone</h2>
+      <form th:action="@{/admin/users/{id}/2fa-reset(id=${existing.id()})}" method="post"
+            data-confirm="Reset the authenticator? The person will scan a new QR code at the next sign-in.">
+        <button type="submit" class="btn btn-secondary" th:disabled="${!existing.totpEnabled()}">Reset two-factor</button>
+      </form>
+    </article>
+    <article class="card" th:if="${self}">
+      <h2>Your own account</h2>
+      <p class="muted">Change your password from the <a th:href="@{/account/password}">Password page</a>. Another super admin
+        can reset your authenticator if you lose your phone.</p>
+      <form th:action="@{/admin/users/{id}/2fa-reset(id=${existing.id()})}" method="post"
+            data-confirm="Reset your authenticator? You will scan a new QR code at your next sign-in.">
+        <button type="submit" class="btn btn-secondary" th:disabled="${!existing.totpEnabled()}">Reset my two-factor</button>
+      </form>
+    </article>
+  </section>
+</main>
+</body>
+</html>

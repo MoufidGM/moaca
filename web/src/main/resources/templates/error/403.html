@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Not allowed')}"></head>
+<body class="auth-page">
+<main class="auth">
+  <div class="card auth-card">
+    <div class="auth-brand">CSLSM</div>
+    <h1>Not allowed</h1>
+    <p class="muted">Your account does not have access to this page.</p>
+    <a class="btn btn-primary btn-block" th:href="@{/}">Back to the app</a>
+    <form th:action="@{/logout}" method="post" class="auth-cancel">
+      <button type="submit" class="btn-link">Sign out and sign in as someone else</button>
+    </form>
+  </div>
+</main>
+</body>
+</html>

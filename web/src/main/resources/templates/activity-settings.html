@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Activity settings')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('activities')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Activity settings</h1>
+    <a class="btn-link" th:href="@{/activities}">Back to activities</a>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <!-- ===== Old spellings on expenses ===== -->
+  <section class="card callout-warn" th:if="${!unknown.isEmpty()}">
+    <div class="card-head">
+      <h2>Activity names on expenses that are not in the list</h2>
+      <form th:if="${suggestedCount > 0}" th:action="@{/activities/settings/merge-suggested}" method="post" class="inline"
+            th:attr="data-confirm='Move the expenses of ' + ${suggestedCount} + ' old spelling(s) to the suggested activities?'">
+        <button type="submit" class="btn btn-primary" th:text="'Apply the ' + ${suggestedCount} + ' suggestion(s)'">Apply</button>
+      </form>
+    </div>
+    <p class="muted">These were typed freely in the desktop app. Until they are merged, their costs count without an activity.
+      Merging changes the activity written on those expenses; it is recorded in the audit log.</p>
+    <table class="table">
+      <thead><tr><th>Written as</th><th class="num">Expenses</th><th class="num">Amount</th><th>Move to</th></tr></thead>
+      <tbody>
+      <tr th:each="u : ${unknown}">
+        <td th:text="${u.label()}">T-Foot</td>
+        <td class="num" th:text="${u.expenses()}">30</td>
+        <td class="num" th:text="${#numbers.formatDecimal(u.amount(), 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td>
+          <form th:action="@{/activities/settings/merge}" method="post" class="inline-form">
+            <input type="hidden" name="from" th:value="${u.name()}" th:unless="${u.isBlank()}">
+            <input type="hidden" name="blank" value="true" th:if="${u.isBlank()}">
+            <select name="to" required aria-label="Move to">
+              <option value="">— choose —</option>
+              <option th:each="a : ${activeActivities}" th:value="${a.name}" th:text="${a.name}"
+                      th:selected="${a.name == u.suggestion()}">Terrain</option>
+              <option value="__NEW__" th:unless="${u.isBlank()}" th:text="'Keep “' + ${u.name()} + '” as a new activity'">new</option>
+            </select>
+            <button type="submit" class="btn btn-secondary">Move</button>
+          </form>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ===== Rules ===== -->
+  <section class="card">
+    <h2>How each activity's costs count</h2>
+    <ul class="notes muted">
+      <li><strong>Earns revenue</strong> — the departments in the daily log (and drinks), plus Tiki Taka and the Salon with the
+        sales entered on their pages. Their expenses are direct costs.</li>
+      <li><strong>Shared by all activities</strong> — common costs (general, cleaning, technical…), spread over the activities that earn revenue.</li>
+      <li><strong>Its own line</strong> — shown separately with its costs, e.g. something that has no revenue in the daily log.</li>
+      <li><strong>Part of …</strong> — its costs count for an activity that earns revenue (e.g. tournaments as part of Terrain).</li>
+    </ul>
+    <table class="table">
+      <thead><tr><th>Activity</th><th>Counts as</th></tr></thead>
+      <tbody>
+      <tr th:each="a : ${activities}" th:classappend="${!a.active} ? 'row-muted'">
+        <td>
+          <a th:href="@{/activities/detail(name=${a.name})}" th:text="${a.name}">Terrain</a>
+          <span class="tag" th:unless="${a.active}">off</span>
+        </td>
+        <td>
+          <form th:action="@{/activities/settings/{id}(id=${a.id})}" method="post" class="inline-form">
+            <span th:if="${a.revenue}" class="rule-fixed"
+                  th:text="${a.incomeColumn == 'restaurant' or a.incomeColumn == 'salon'} ? 'Earns revenue (its own sales page)' : 'Earns revenue (daily log)'">Earns revenue (daily log)</span>
+            <select name="rule" th:unless="${a.revenue}" aria-label="Counts as">
+              <option value="SHARED" th:selected="${a.rule.name() == 'SHARED'}">Shared by all activities</option>
+              <option value="SEPARATE" th:selected="${a.rule.name() == 'SEPARATE'}">Its own line</option>
+              <option value="PART_OF" th:selected="${a.rule.name() == 'PART_OF'}">Part of…</option>
+            </select>
+            <select name="partOf" th:unless="${a.revenue}" aria-label="Part of which activity">
+              <option value="">(only for “Part of”)</option>
+              <option th:each="r : ${revenueActivities}" th:value="${r.name}" th:text="${r.name}"
+                      th:selected="${r.name == a.partOf}">Terrain</option>
+            </select>
+            <label class="check inline-check"><input type="checkbox" name="active" value="true" th:checked="${a.active}"> in use</label>
+            <button type="submit" class="btn btn-secondary">Save</button>
+          </form>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+    <p class="muted small">Switching an activity off hides it from the expense form; its past expenses still count.</p>
+  </section>
+
+  <!-- ===== Allocation keys ===== -->
+  <section class="grid grid-2">
+    <article class="card">
+      <h2>Electricity, water, phone, internet — who pays what share</h2>
+      <p class="muted small">Bills recorded on a shared activity (e.g. General) are divided by these percentages. Leave all
+        empty to divide them by revenue instead.</p>
+      <form th:action="@{/activities/settings/key}" method="post">
+        <input type="hidden" name="kind" value="UTILITIES">
+        <div class="split-row" th:each="a : ${revenueActivities}">
+          <input type="hidden" name="keyActivity" th:value="${a.name}">
+          <span class="key-label" th:text="${a.name}">Gym</span>
+          <input type="text" name="keyPercent" inputmode="decimal" maxlength="6" th:value="${utilitiesKey.containsKey(a.name)} ? ${#numbers.formatDecimal(utilitiesKey.get(a.name), 1, 'POINT', 2, 'POINT')} : ''" aria-label="Percent">
+          <span class="muted">%</span>
+        </div>
+        <button type="submit" class="btn btn-secondary">Save</button>
+      </form>
+    </article>
+    <article class="card">
+      <h2>Other common costs — who pays what share</h2>
+      <p class="muted small">Cleaning, technical, general purchases and anything else on a shared activity. Salaries of
+        shared staff are <em>not</em> here: they follow each employee's own split (see Staff).</p>
+      <form th:action="@{/activities/settings/key}" method="post">
+        <input type="hidden" name="kind" value="COMMON">
+        <div class="split-row" th:each="a : ${revenueActivities}">
+          <input type="hidden" name="keyActivity" th:value="${a.name}">
+          <span class="key-label" th:text="${a.name}">Gym</span>
+          <input type="text" name="keyPercent" inputmode="decimal" maxlength="6" th:value="${commonKey.containsKey(a.name)} ? ${#numbers.formatDecimal(commonKey.get(a.name), 1, 'POINT', 2, 'POINT')} : ''" aria-label="Percent">
+          <span class="muted">%</span>
+        </div>
+        <button type="submit" class="btn btn-secondary">Save</button>
+      </form>
+    </article>
+  </section>
+
+  <!-- ===== Add ===== -->
+  <section class="card">
+    <h2>Add an activity</h2>
+    <form th:action="@{/activities/settings/new}" method="post" class="inline-form">
+      <label class="field grow"><span>Name</span><input type="text" name="name" required maxlength="40"></label>
+      <label class="field"><span>Counts as</span>
+        <select name="rule">
+          <option value="SEPARATE">Its own line</option>
+          <option value="SHARED">Shared by all activities</option>
+          <option value="PART_OF">Part of…</option>
+        </select>
+      </label>
+      <label class="field"><span>Part of</span>
+        <select name="partOf">
+          <option value="">—</option>
+          <option th:each="r : ${revenueActivities}" th:value="${r.name}" th:text="${r.name}">Terrain</option>
+        </select>
+      </label>
+      <button type="submit" class="btn btn-primary">Add</button>
+    </form>
+    <p class="muted small">A new activity cannot earn revenue by itself: revenue comes from the columns of the daily log.</p>
+  </section>
+</main>
+</body>
+</html>

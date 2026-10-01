@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Staff')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('employees')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Staff</h1>
+    <a class="btn btn-primary" th:href="@{/employees/new}">+ New employee</a>
+    <a class="btn btn-secondary" th:href="@{/payroll}">Monthly payroll</a>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <section class="card">
+    <p class="muted">Each employee's pay is divided between activities once. Coaches are 100% their activity;
+      shared staff (reception, cleaning, security…) get a split. Payroll then records salaries already divided,
+      so the activity analysis shows direct and shared salaries automatically.</p>
+    <p class="muted" th:if="${employees.isEmpty()}">No employees yet.</p>
+    <table class="table" th:if="${!employees.isEmpty()}">
+      <thead><tr><th>Name</th><th>Job</th><th>Pay counts for</th><th class="num">Monthly salary</th></tr></thead>
+      <tbody>
+      <tr th:each="e : ${employees}" th:classappend="${!e.active()} ? 'row-muted'">
+        <td><a th:href="@{/employees/{id}(id=${e.id()})}" th:text="${e.name()}">Name</a>
+          <span class="tag" th:unless="${e.active()}">left</span></td>
+        <td th:text="${e.job()}">Coach</td>
+        <td th:text="${e.splitLabel()}">Académie</td>
+        <td class="num" th:text="${e.monthlySalary() != null} ? ${#numbers.formatDecimal(e.monthlySalary(), 1, 'COMMA', 0, 'POINT')} : '—'">0</td>
+      </tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Set up two-factor')}"></head>
+<body class="auth-page">
+<main class="auth">
+  <div class="card auth-card auth-card-wide">
+    <div class="auth-brand">CSLSM</div>
+    <h1>Set up two-factor sign-in</h1>
+    <p class="muted">Your account can see the center's finances, so every sign-in also needs a code from your phone.</p>
+
+    <p class="alert alert-error" th:if="${param.error}">That code did not match. Check the phone's clock is automatic and try the next code.</p>
+
+    <ol class="steps">
+      <li>Install an authenticator app on your phone — Google Authenticator, Microsoft Authenticator or 1Password.</li>
+      <li>
+        In the app, add an account and scan this code:
+        <div class="qr-box" th:utext="${qrSvg}"></div>
+        <details class="manual-key">
+          <summary>Can't scan? Enter this key instead</summary>
+          <code th:text="${secretGrouped}">XXXX XXXX</code>
+        </details>
+      </li>
+      <li>
+        Type the 6-digit code the app now shows:
+        <form th:action="@{/2fa/setup}" method="post">
+          <label class="field">
+            <span class="sr-only">Code</span>
+            <input class="code-input" type="text" name="code" inputmode="numeric" pattern="[0-9 ]{6,7}"
+                   maxlength="7" autocomplete="one-time-code" required autofocus>
+          </label>
+          <button type="submit" class="btn btn-primary btn-block">Confirm and sign in</button>
+        </form>
+      </li>
+    </ol>
+
+    <form th:action="@{/logout}" method="post" class="auth-cancel">
+      <button type="submit" class="btn-link">Cancel and sign out</button>
+    </form>
+  </div>
+</main>
+</body>
+</html>

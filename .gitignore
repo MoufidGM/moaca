@@ -1,0 +1,21 @@
+# Build output and IDE files
+target/
+web/target/
+dist/
+.idea/
+*.iml
+.claude/
+.DS_Store
+~$*
+
+# Data: the real database, its working copies, uploaded files and the dev accounts never leave this machine
+data/
+*.db
+*.db-shm
+*.db-wal
+web-dev-files/
+
+# Exports of real figures and the packaged desktop app
+/*.csv
+CSLSM.zip
+CSLSM/

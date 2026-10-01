@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Activities')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('activities')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Activities</h1>
+    <span class="muted" th:text="${period.label()}">1 Jan – 30 Sep 2026</span>
+    <a class="btn btn-secondary" th:href="@{/activities/settings}">Activity settings</a>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <!-- ===== Period and how common costs are shared ===== -->
+  <section class="card filters">
+    <div class="filter-row">
+      <nav class="seg" aria-label="Period">
+        <a th:each="pk : ${presets}" th:href="@{/activities(period=${pk[0]},spread=${spread})}" th:text="${pk[1]}"
+           th:classappend="${period.key() == pk[0]} ? 'active'">This year</a>
+      </nav>
+      <form th:action="@{/activities}" method="get" class="inline-form">
+        <input type="hidden" name="period" value="custom">
+        <input type="hidden" name="spread" th:value="${spread}">
+        <label>From <input type="date" name="from" th:value="${period.from()}"></label>
+        <label>To <input type="date" name="to" th:value="${period.to()}"></label>
+        <button type="submit" class="btn btn-secondary">Show</button>
+      </form>
+    </div>
+    <div class="filter-row">
+      <span class="muted small">Common costs (general, cleaning, technical…):</span>
+      <nav class="seg" aria-label="How common costs are shared">
+        <a th:href="@{/activities(period=${period.key()},from=${period.from()},to=${period.to()},spread='REVENUE')}"
+           th:classappend="${spread == 'REVENUE'} ? 'active'">Shared by revenue</a>
+        <a th:href="@{/activities(period=${period.key()},from=${period.from()},to=${period.to()},spread='EQUAL')}"
+           th:classappend="${spread == 'EQUAL'} ? 'active'">Shared equally</a>
+        <a th:href="@{/activities(period=${period.key()},from=${period.from()},to=${period.to()},spread='NONE')}"
+           th:classappend="${spread == 'NONE'} ? 'active'">Shown separately</a>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ===== Center totals ===== -->
+  <section class="grid grid-3">
+    <article class="card stat">
+      <div class="stat-label">Revenue</div>
+      <div class="stat-value" th:text="${#numbers.formatDecimal(result.totalRevenue, 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub">all activities, drinks included</div>
+    </article>
+    <article class="card stat">
+      <div class="stat-label">Costs</div>
+      <div class="stat-value" th:text="${#numbers.formatDecimal(result.totalCosts, 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub" th:text="'of which common costs ' + ${#numbers.formatDecimal(result.sharedTotal, 1, 'COMMA', 0, 'POINT')}">common</div>
+    </article>
+    <article class="card stat stat-main">
+      <div class="stat-label">Profit</div>
+      <div class="stat-value" th:classappend="${result.profit < 0} ? 'negative' : 'positive'"
+           th:text="${#numbers.formatDecimal(result.profit, 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub" th:if="${result.totalRevenue > 0}"
+           th:text="'margin ' + ${#numbers.formatPercent(result.profit / result.totalRevenue, 1, 0)}">margin</div>
+    </article>
+  </section>
+
+  <p class="alert alert-info" th:if="${result.unassignedCount > 0}">
+    <strong th:text="${result.unassignedCount} + ' expense(s) (' + ${#numbers.formatDecimal(result.unassignedTotal, 1, 'COMMA', 0, 'POINT')} + ')'">n</strong>
+    use activity names that are not in the list (old spellings like “T-Foot” or “Menage”), so they count as costs
+    without an activity. <a th:href="@{/activities/settings}">Clean them up →</a>
+  </p>
+
+  <!-- ===== Per activity ===== -->
+  <section class="card">
+    <h2>Profit by activity</h2>
+    <table class="table">
+      <thead>
+      <tr>
+        <th>Activity</th>
+        <th class="num">Revenue</th>
+        <th class="num">Share</th>
+        <th class="num">Direct costs</th>
+        <th class="num" th:if="${spread != 'NONE'}">Common costs</th>
+        <th class="num">Profit</th>
+        <th class="num">Margin</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr th:each="r : ${result.revenueRows}" th:if="${r.name != 'Tiki Taka'}" th:classappend="${r.revenue == 0 and r.costs == 0} ? 'row-muted'">
+        <td><a th:href="@{/activities/detail(name=${r.name},period=${period.key()},from=${period.from()},to=${period.to()},spread=${spread})}"
+               th:text="${r.name}">Terrain</a></td>
+        <td class="num" th:text="${#numbers.formatDecimal(r.revenue, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:text="${#numbers.formatPercent(r.revenueShare, 1, 0)}">0%</td>
+        <td class="num" th:text="${#numbers.formatDecimal(r.directCosts, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:if="${spread != 'NONE'}" th:text="${#numbers.formatDecimal(r.sharedCosts, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num strong" th:classappend="${r.profit < 0} ? 'negative' : 'positive'"
+            th:text="${#numbers.formatDecimal(r.profit, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:text="${r.margin != null} ? ${#numbers.formatPercent(r.margin, 1, 0)} : '—'">0%</td>
+      </tr>
+      </tbody>
+      <tbody th:with="tt=${result.row('Tiki Taka')}" th:if="${result.row('Tiki Taka') != null}">
+      <tr class="group-head"><td colspan="7">Restaurant — its own sales, staff and expenses</td></tr>
+      <tr th:with="r=${result.row('Tiki Taka')}">
+        <td><a th:href="@{/activities/detail(name='Tiki Taka',period=${period.key()},from=${period.from()},to=${period.to()},spread=${spread})}">Tiki Taka</a></td>
+        <td class="num" th:text="${#numbers.formatDecimal(r.revenue, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:text="${#numbers.formatPercent(r.revenueShare, 1, 0)}">0%</td>
+        <td class="num" th:text="${#numbers.formatDecimal(r.directCosts, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:if="${spread != 'NONE'}" th:text="${#numbers.formatDecimal(r.sharedCosts, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num strong" th:classappend="${r.profit < 0} ? 'negative' : 'positive'" th:text="${#numbers.formatDecimal(r.profit, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:text="${r.margin != null} ? ${#numbers.formatPercent(r.margin, 1, 0)} : '—'">0%</td>
+      </tr>
+      </tbody>
+      <tbody th:if="${!result.otherRows.isEmpty()}">
+      <tr class="group-head"><td colspan="7">Costs with no revenue of their own</td></tr>
+      <tr th:each="r : ${result.otherRows}">
+        <td>
+          <a th:if="${r.kind.name() == 'SEPARATE'}"
+             th:href="@{/activities/detail(name=${r.name},period=${period.key()},from=${period.from()},to=${period.to()},spread=${spread})}"
+             th:text="${r.name}">Salon</a>
+          <span th:if="${r.kind.name() == 'SHARED'}" th:text="${r.name}">Shared costs</span>
+          <span th:if="${r.kind.name() == 'UNASSIGNED'}">
+            <span th:text="'“' + ${r.name} + '”'">T-Foot</span>
+            <a class="tag tag-warn" th:href="@{/activities/settings}">not in the list</a>
+          </span>
+        </td>
+        <td class="num">—</td>
+        <td></td>
+        <td class="num" th:text="${#numbers.formatDecimal(r.directCosts, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td th:if="${spread != 'NONE'}"></td>
+        <td class="num strong negative" th:text="${#numbers.formatDecimal(r.profit, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td></td>
+      </tr>
+      </tbody>
+      <tfoot>
+      <tr>
+        <td>Center</td>
+        <td class="num" th:text="${#numbers.formatDecimal(result.totalRevenue, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num">100%</td>
+        <td class="num" th:attr="colspan=${spread != 'NONE'} ? 2 : 1"
+            th:text="${#numbers.formatDecimal(result.totalCosts, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:classappend="${result.profit < 0} ? 'negative' : 'positive'"
+            th:text="${#numbers.formatDecimal(result.profit, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:text="${result.totalRevenue > 0} ? ${#numbers.formatPercent(result.profit / result.totalRevenue, 1, 0)} : '—'">0%</td>
+      </tr>
+      </tfoot>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Revenue and costs</h2>
+    <div class="chart-box" th:utext="${chartSvg}"></div>
+  </section>
+
+  <section class="card">
+    <h2>How to read this</h2>
+    <ul class="notes">
+      <li><strong>Direct costs</strong>: expenses recorded for the activity (or the part of a split expense).</li>
+      <li><strong>Common costs</strong>: expenses for activities set as “shared” (General, Cleaning, Technical…),
+        spread over the activities that earn revenue.
+        <span th:if="${result.utilitiesKeyUsed}">Utility bills follow the percentages set in Activity settings.</span>
+        <span th:if="${result.commonKeyUsed}">Other common costs follow the percentages set in Activity settings.</span>
+        Without a key — <span th:switch="${spread}">
+          <span th:case="'EQUAL'">the same amount each.</span>
+          <span th:case="'NONE'">here shown on their own line instead.</span>
+          <span th:case="*">in proportion to their revenue, so busier activities carry more.</span></span></li>
+      <li>Pending expenses count until an admin rejects them. Rows always add up to the center's profit.</li>
+      <li>Change which activities are shared, on their own line, or part of another in
+        <a th:href="@{/activities/settings}">Activity settings</a>.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

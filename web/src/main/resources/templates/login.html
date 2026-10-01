@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Sign in')}"></head>
+<body class="auth-page">
+<main class="auth">
+  <form class="card auth-card" th:action="@{/login}" method="post" autocomplete="on">
+    <div class="auth-brand">CSLSM</div>
+    <h1>Sign in</h1>
+
+    <p class="alert alert-error" th:if="${param.error}">
+      Wrong username or password, or the account is temporarily locked.
+    </p>
+    <p class="alert alert-error" th:if="${param.locked}">
+      Too many wrong codes. The account is locked for 15 minutes.
+    </p>
+    <p class="alert alert-info" th:if="${param.logout}">You are signed out.</p>
+    <p class="alert alert-info" th:if="${param.expired}">Your session expired. Please sign in again.</p>
+
+    <label class="field">
+      <span>Username</span>
+      <input type="text" name="username" autocomplete="username" autocapitalize="none" spellcheck="false"
+             required autofocus maxlength="32">
+    </label>
+    <label class="field">
+      <span>Password</span>
+      <input type="password" name="password" autocomplete="current-password" required maxlength="200">
+    </label>
+    <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+  </form>
+</main>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Salon')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('salon')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Salon</h1>
+    <span class="muted">Daily sales, entered by the reception</span>
+    <a class="btn btn-primary" th:href="@{/expenses/new}">+ Salon expense</a>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <section class="grid grid-2">
+    <!-- ===== Today's sales ===== -->
+    <article class="card">
+      <h2>Sales of the day</h2>
+      <p class="muted small">Either <a th:href="@{/daily-logs}">upload the day's file</a> (SA-dd-MM-yyyy.xlsx, from the
+        <a th:href="@{/daily-logs/template/salon}">template</a>), or type the day's totals here.</p>
+      <p class="muted small">Enter the Salon's takings at closing time. The cash goes into the reception till with the day's
+        income; card payments go to the bank. Entering a day again replaces its figures.</p>
+      <form th:action="@{/salon/sales}" method="post" class="form">
+        <div class="form-grid">
+          <label class="field"><span>Day</span>
+            <input type="date" name="date" th:value="${today}" th:attr="min=${minDate},max=${today}" required></label>
+          <label class="field"><span>Clients (optional)</span>
+            <input type="text" name="clients" inputmode="numeric" maxlength="5" th:value="${todaySale != null and todaySale.clients() != null} ? ${todaySale.clients()} : ''"></label>
+          <label class="field"><span>Cash</span>
+            <input type="text" name="cash" inputmode="decimal" maxlength="20" required th:value="${todaySale != null} ? ${#numbers.formatDecimal(todaySale.cash(), 1, 'POINT', 2, 'POINT')} : ''"></label>
+          <label class="field"><span>Card</span>
+            <input type="text" name="card" inputmode="decimal" maxlength="20" required th:value="${todaySale != null} ? ${#numbers.formatDecimal(todaySale.card(), 1, 'POINT', 2, 'POINT')} : ''"></label>
+          <label class="field span-2"><span>Note (optional)</span>
+            <input type="text" name="note" maxlength="200" th:value="${todaySale != null} ? ${todaySale.note()} : ''" placeholder="e.g. closed in the afternoon"></label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" th:text="${todaySale != null} ? 'Update today' : 'Record today'">Record</button>
+        </div>
+      </form>
+    </article>
+
+    <!-- ===== Month (admins) ===== -->
+    <article class="card" th:if="${isAdmin}">
+      <div class="card-head">
+        <h2>
+          <a class="btn btn-secondary" th:href="@{/salon(month=${prevMonth})}" aria-label="Previous month">‹</a>
+          <span th:text="${monthLabel}">September 2026</span>
+          <a class="btn btn-secondary" th:href="@{/salon(month=${nextMonth})}" aria-label="Next month">›</a>
+        </h2>
+        <span class="muted" th:text="${daysEntered} + ' day(s) entered'">days</span>
+      </div>
+      <div class="stat"><div class="stat-label">Sales</div>
+        <div class="stat-value" th:text="${#numbers.formatDecimal(cashTotal + cardTotal, 1, 'COMMA', 0, 'POINT')}">0</div>
+        <div class="stat-sub" th:text="'cash ' + ${#numbers.formatDecimal(cashTotal, 1, 'COMMA', 0, 'POINT')} + ' · card ' + ${#numbers.formatDecimal(cardTotal, 1, 'COMMA', 0, 'POINT')}">split</div></div>
+      <div class="stat"><div class="stat-label">Salon expenses</div>
+        <div class="stat-value" th:text="${#numbers.formatDecimal(expensesTotal, 1, 'COMMA', 0, 'POINT')}">0</div>
+        <div class="stat-sub" th:text="${expenseCount} + ' expense(s)'">n</div></div>
+      <div class="stat"><div class="stat-label">Sales minus expenses</div>
+        <div class="stat-value" th:classappend="${cashTotal + cardTotal - expensesTotal < 0} ? 'negative' : 'positive'"
+             th:text="${#numbers.formatDecimal(cashTotal + cardTotal - expensesTotal, 1, 'COMMA', 0, 'POINT')}">0</div>
+        <div class="stat-sub"><a th:href="@{/activities/detail(name='Salon',period='month')}">full analysis with shared costs →</a></div></div>
+    </article>
+  </section>
+
+  <!-- ===== Days ===== -->
+  <section class="card">
+    <h2 th:text="${isAdmin} ? 'Days of ' + ${monthLabel} : 'Last 14 days'">Days</h2>
+    <table class="table" th:if="${!sales.isEmpty()}">
+      <thead><tr><th>Day</th><th class="num">Cash</th><th class="num">Card</th><th class="num">Total</th><th class="num">Clients</th><th>Note</th><th>By</th><th th:if="${isAdmin}"></th></tr></thead>
+      <tbody>
+      <tr th:each="s : ${sales}">
+        <td class="nowrap" th:text="${#temporals.format(s.date(), 'EEE d MMM')}">Mon 1 Sep</td>
+        <td class="num" th:text="${#numbers.formatDecimal(s.cash(), 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:text="${#numbers.formatDecimal(s.card(), 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num strong" th:text="${#numbers.formatDecimal(s.total(), 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:text="${s.clients() != null} ? ${s.clients()} : ''">0</td>
+        <td th:text="${s.note()}">note</td>
+        <td th:text="${s.enteredBy()}">desk</td>
+        <td th:if="${isAdmin}">
+          <form th:action="@{/salon/sales/delete}" method="post" class="inline" data-confirm="Delete this day's Salon sales?">
+            <input type="hidden" name="date" th:value="${s.date()}">
+            <button type="submit" class="btn-link" aria-label="Delete">✕</button>
+          </form>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+    <p class="muted" th:if="${sales.isEmpty()}">No Salon sales entered yet.</p>
+    <p class="muted small" th:unless="${isAdmin}">You can correct the last 7 days; ask an admin for older ones.</p>
+  </section>
+</main>
+</body>
+</html>

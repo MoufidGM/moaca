@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Import expenses')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('expenses')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Import an expense sheet</h1>
+    <a class="btn-link" th:href="@{/expenses}">Back to expenses</a>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+  <p class="alert alert-error" th:if="${error != null}" th:text="${error}">Problem</p>
+
+  <section class="card" th:if="${preview == null}">
+    <p>Columns: <strong>Date | Category | Description | Amount | Payment | Entered by | Approved by | Activity | Paid from</strong>.
+      You will see every row checked before anything is saved.</p>
+    <p><a th:href="@{/expenses/import/template}">Download the template</a> (the Help sheet explains each column).</p>
+    <form th:action="@{/expenses/import}" method="post" enctype="multipart/form-data" class="inline-upload">
+      <input type="file" name="file" accept=".xlsx,.xls" required data-max-mb="5">
+      <button type="submit" class="btn btn-primary">Check the file</button>
+    </form>
+  </section>
+
+  <th:block th:if="${preview != null}">
+    <section class="card">
+      <div class="card-head">
+        <h2 th:text="${preview.fileName()}">file.xlsx</h2>
+        <span class="muted"
+              th:text="${preview.okCount()} + ' rows ready (' + ${#numbers.formatDecimal(preview.okTotal(), 1, 'COMMA', 0, 'POINT')} + '), ' + ${preview.errorCount()} + ' with errors'">x</span>
+      </div>
+      <p class="alert alert-error" th:if="${preview.errorCount() > 0}">
+        Rows with errors (in red) will be skipped. Fix them in the sheet and import again, or continue without them.
+      </p>
+      <form th:action="@{/expenses/import/confirm}" method="post" class="form-actions"
+            th:if="${preview.okCount() > 0}"
+            th:attr="data-confirm='Import ' + ${preview.okCount()} + ' expenses as approved?'">
+        <input type="hidden" name="token" th:value="${preview.token()}">
+        <button type="submit" class="btn btn-primary" th:text="'Import ' + ${preview.okCount()} + ' rows'">Import</button>
+        <a class="btn btn-secondary" th:href="@{/expenses/import}">Choose another file</a>
+      </form>
+      <table class="table">
+        <thead>
+        <tr><th>Row</th><th>Date</th><th>Category</th><th>Description</th><th>Activity</th><th>Paid from</th><th class="num">Amount</th><th>Check</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="r : ${preview.rows()}" th:classappend="${!r.ok()} ? 'row-error' : (${!r.notes().isEmpty()} ? 'row-warn' : '')">
+          <td th:text="${r.rowNumber()}">2</td>
+          <td class="nowrap" th:text="${r.date() != null} ? ${r.date()} : '—'">2026-06-01</td>
+          <td th:text="${r.category()}">Supplies</td>
+          <td th:text="${r.description()}">desc</td>
+          <td th:text="${r.activity()}">General</td>
+          <td th:text="${r.paidFrom()}">RECEPTION</td>
+          <td class="num" th:text="${r.amount() != null} ? ${#numbers.formatDecimal(r.amount(), 1, 'COMMA', 2, 'POINT')} : ''">0</td>
+          <td class="small">
+            <div th:each="m : ${r.errors()}" class="text-error" th:text="${m}">error</div>
+            <div th:each="m : ${r.notes()}" class="muted" th:text="${m}">note</div>
+            <span th:if="${r.ok() and r.notes().isEmpty()}">OK</span>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </section>
+  </th:block>
+</main>
+</body>
+</html>

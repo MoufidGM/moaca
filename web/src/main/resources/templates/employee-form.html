@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${pageTitle})}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('employees')}"></header>
+
+<main class="page page-narrow">
+  <div class="page-head">
+    <h1 th:text="${pageTitle}">New employee</h1>
+    <a class="btn-link" th:href="@{/employees}">Cancel</a>
+  </div>
+
+  <p class="alert alert-error" th:if="${error != null}" th:text="${error}">Problem</p>
+
+  <form class="card form" method="post"
+        th:action="${existing == null} ? @{/employees/new} : @{/employees/{id}(id=${existing.id()})}">
+    <div class="form-grid">
+      <label class="field"><span>Name</span><input type="text" name="name" th:value="${in.name()}" required maxlength="60"></label>
+      <label class="field"><span>Job (optional)</span><input type="text" name="job" th:value="${in.job()}" maxlength="60" placeholder="Coach, réception, ménage…"></label>
+      <label class="field"><span>Monthly salary (optional, prefilled in payroll)</span>
+        <input type="text" name="salary" inputmode="decimal" th:value="${in.salary()}" maxlength="20"></label>
+      <label class="check" th:if="${existing != null}">
+        <input type="checkbox" name="active" value="true" th:checked="${in.active()}"><span>Still employed</span>
+      </label>
+    </div>
+
+    <h2>Pay counts for</h2>
+    <p class="muted small">One line at 100% for someone who works for a single activity. Several lines for shared staff,
+      e.g. Location de terrains 70%, Gym 30%. Percentages must add up to 100.</p>
+    <div class="split-row" th:each="row : ${splitRows}">
+      <select name="splitActivity" aria-label="Activity">
+        <option value="">—</option>
+        <option th:each="a : ${activities}" th:value="${a.name()}" th:text="${a.name()}"
+                th:selected="${#strings.equalsIgnoreCase(a.name(), row[0])}">Académie</option>
+      </select>
+      <input type="text" name="splitPercent" inputmode="decimal" maxlength="6" placeholder="100" th:value="${row[1]}" aria-label="Percentage">
+      <span class="muted">%</span>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</main>
+</body>
+</html>

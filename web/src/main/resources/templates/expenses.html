@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Expenses')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('expenses')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Expenses</h1>
+    <a class="btn btn-primary" th:href="@{/expenses/new}">+ New expense</a>
+    <a class="btn btn-secondary" th:if="${isAdmin}" th:href="@{/expenses/import}">Import sheet</a>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <!-- ===== Admin: things to act on ===== -->
+  <section class="grid grid-2" th:if="${isAdmin}">
+    <a class="card callout" th:classappend="${pending.count() > 0} ? 'callout-warn'" th:href="@{/expenses(status='PENDING')}">
+      <strong th:text="${pending.count()} + ' waiting for approval'">0 waiting</strong>
+      <span class="muted" th:if="${pending.count() > 0}"
+            th:text="'Total ' + ${#numbers.formatDecimal(pending.amount(), 1, 'COMMA', 0, 'POINT')}">Total</span>
+    </a>
+    <a class="card callout" th:classappend="${suspects.count() > 0} ? 'callout-warn'" th:href="@{/expenses(suspects=true)}">
+      <strong th:text="${suspects.count()} + ' look like bank deposits'">0</strong>
+      <span class="muted" th:if="${suspects.count() > 0}"
+            th:text="${#numbers.formatDecimal(suspects.amount(), 1, 'COMMA', 0, 'POINT')} + ' counted as expenses — open each one and use “This is a bank deposit”'">x</span>
+    </a>
+  </section>
+
+  <!-- ===== Filters ===== -->
+  <form class="card filters" th:action="@{/expenses}" method="get">
+    <div class="filter-row" th:if="${isAdmin}">
+      <a class="btn btn-secondary" th:href="@{/expenses(month=${prevMonth})}" aria-label="Previous month">‹</a>
+      <label>Month <input type="month" name="month" th:value="${query.month}"></label>
+      <a class="btn btn-secondary" th:href="@{/expenses(month=${nextMonth})}" aria-label="Next month">›</a>
+      <label>Status
+        <select name="status">
+          <option value="">All</option>
+          <option value="PENDING" th:selected="${query.status == 'PENDING'}">Pending</option>
+          <option value="APPROVED" th:selected="${query.status == 'APPROVED'}">Approved</option>
+          <option value="REJECTED" th:selected="${query.status == 'REJECTED'}">Rejected</option>
+        </select>
+      </label>
+      <label>Category
+        <select name="category">
+          <option value="">All</option>
+          <option th:each="c : ${categoriesInUse}" th:value="${c}" th:text="${c}" th:selected="${c == query.category}">c</option>
+        </select>
+      </label>
+      <label>Activity
+        <select name="activity">
+          <option value="">All</option>
+          <option th:each="a : ${activitiesInUse}" th:value="${a}" th:text="${a}" th:selected="${a == query.activity}">a</option>
+        </select>
+      </label>
+      <label>Paid from
+        <select name="paidFrom">
+          <option value="">All</option>
+          <option value="RECEPTION" th:selected="${query.paidFrom == 'RECEPTION'}">Reception till</option>
+          <option value="RESTAURANT" th:selected="${query.paidFrom == 'RESTAURANT'}">Restaurant till</option>
+          <option value="SAFE" th:selected="${query.paidFrom == 'SAFE'}">Safe</option>
+          <option value="BANK" th:selected="${query.paidFrom == 'BANK'}">Association bank account</option>
+          <option value="RESTAURANT_BANK" th:selected="${query.paidFrom == 'RESTAURANT_BANK'}">Tiki Taka bank account</option>
+        </select>
+      </label>
+      <label class="grow">Search <input type="search" name="q" th:value="${query.q}" placeholder="description, person…"></label>
+      <button type="submit" class="btn btn-primary">Filter</button>
+      <a class="btn-link" th:href="@{/expenses}">Reset</a>
+    </div>
+    <div class="filter-row" th:unless="${isAdmin}">
+      <span class="muted">Your expenses from the last 60 days.</span>
+      <label>Status
+        <select name="status">
+          <option value="">All</option>
+          <option value="PENDING" th:selected="${query.status == 'PENDING'}">Waiting for approval</option>
+          <option value="APPROVED" th:selected="${query.status == 'APPROVED'}">Approved</option>
+          <option value="REJECTED" th:selected="${query.status == 'REJECTED'}">Rejected</option>
+        </select>
+      </label>
+      <label class="grow">Search <input type="search" name="q" th:value="${query.q}"></label>
+      <button type="submit" class="btn btn-primary">Filter</button>
+    </div>
+  </form>
+
+  <!-- ===== List ===== -->
+  <section class="card">
+    <div class="card-head">
+      <h2 th:text="${isAdmin and query.status != 'PENDING' and !query.suspects} ? ${monthLabel} : 'Expenses'">Month</h2>
+      <span class="muted" th:text="${rows.size()} + ' entries · total ' + ${#numbers.formatDecimal(total, 1, 'COMMA', 0, 'POINT')} + ' (rejected not counted)'">0</span>
+    </div>
+    <p class="muted" th:if="${rows.isEmpty()}">No expenses match.</p>
+
+    <form th:if="${!rows.isEmpty()}" th:action="@{/expenses/approve}" method="post" id="bulk-approve">
+      <table class="table">
+        <thead>
+        <tr>
+          <th th:if="${isAdmin}"><input type="checkbox" data-select-all="ids" aria-label="Select all pending"></th>
+          <th>Date</th><th>Category</th><th>Description</th><th>Activity</th>
+          <th th:if="${isAdmin}">Paid from</th><th th:if="${isAdmin}">Entered by</th>
+          <th>Status</th><th class="num">Amount</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="e : ${rows}" th:classappend="${e.isRejected()} ? 'row-muted' : (${e.isPending()} ? 'row-warn' : '')">
+          <td th:if="${isAdmin}"><input type="checkbox" name="ids" th:value="${e.id()}" th:if="${e.isPending()}" aria-label="Select"></td>
+          <td class="nowrap" th:text="${#temporals.format(e.date(), 'dd MMM yyyy')}">01 Sep 2026</td>
+          <td th:text="${e.category()}">Supplies</td>
+          <td>
+            <a th:href="@{/expenses/{id}(id=${e.id()})}" th:text="${e.description() != null ? e.description() : '(no description)'}">desc</a>
+            <span class="tag" th:if="${e.attachmentCount() > 0}" th:text="'📎 ' + ${e.attachmentCount()}">📎 1</span>
+            <span class="tag tag-warn" th:if="${isAdmin and e.looksLikeBankDeposit()}">bank deposit?</span>
+          </td>
+          <td><span th:text="${e.activity()}">General</span><span class="tag" th:if="${e.isSplit()}">split</span></td>
+          <td th:if="${isAdmin}" th:text="${e.paidFromLabel()}">Reception</td>
+          <td th:if="${isAdmin}" th:text="${e.enteredBy()}">name</td>
+          <td><span class="status" th:classappend="'status-' + ${#strings.toLowerCase(e.status())}" th:text="${e.statusLabel()}">Approved</span></td>
+          <td class="num" th:text="${#numbers.formatDecimal(e.amount(), 1, 'COMMA', 2, 'POINT')}">0.00</td>
+        </tr>
+        </tbody>
+      </table>
+      <div class="form-actions" th:if="${isAdmin and pending.count() > 0}">
+        <button type="submit" class="btn btn-primary">Approve selected</button>
+      </div>
+    </form>
+  </section>
+</main>
+</body>
+</html>

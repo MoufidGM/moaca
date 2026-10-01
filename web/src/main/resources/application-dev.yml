@@ -1,0 +1,23 @@
+# Development on your Mac: run with  --spring.profiles.active=dev
+# Uses a COPY of the desktop database so testing never touches real data:
+#   cp ../data/daily_logs.db ../data/web-dev.db
+
+spring:
+  datasource:
+    url: jdbc:sqlite:${CSLSM_DB_PATH:../data/web-dev.db}?journal_mode=WAL&busy_timeout=5000&foreign_keys=true
+  thymeleaf:
+    cache: false
+
+server:
+  servlet:
+    session:
+      cookie:
+        # Plain http on localhost during development. Production keeps secure=true.
+        secure: false
+
+cslsm:
+  storage:
+    dir: ${CSLSM_FILES_DIR:../data/web-dev-files}
+  security:
+    # Development-only key. Never use this value on the server.
+    secret-key: ${CSLSM_SECRET_KEY:dev-only-key-do-not-use-on-the-server-0123456789}

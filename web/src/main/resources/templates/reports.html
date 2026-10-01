@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Reports')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('reports')}"></header>
+
+<main class="page" th:with="r=${report}">
+  <div class="page-head">
+    <h1>Reports</h1>
+    <span class="muted" th:text="${r.def().title()} + ' · ' + ${r.year()}">Profit &amp; loss · 2026</span>
+    <a class="btn btn-secondary" th:href="@{/reports/export(report=${r.def().key()},year=${r.year()},format='csv')}">Download CSV</a>
+    <a class="btn btn-primary" th:href="@{/reports/export(report=${r.def().key()},year=${r.year()},format='xlsx')}">Download Excel</a>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <!-- ===== Which report, which year ===== -->
+  <section class="card filters">
+    <div class="filter-row">
+      <nav class="seg" aria-label="Report">
+        <a th:each="d : ${defs}" th:href="@{/reports(report=${d.key()},year=${r.year()})}" th:text="${d.title()}"
+           th:classappend="${d.key() == r.def().key()} ? 'active'" th:title="${d.blurb()}">Profit &amp; loss</a>
+      </nav>
+    </div>
+    <div class="filter-row">
+      <nav class="seg" aria-label="Year">
+        <a th:each="y : ${years}" th:href="@{/reports(report=${r.def().key()},year=${y})}" th:text="${y}"
+           th:classappend="${y == r.year()} ? 'active'">2026</a>
+      </nav>
+      <a class="muted small" th:href="@{/activities}">Profit by activity for any period, with the sharing options →</a>
+    </div>
+  </section>
+
+  <section class="card" th:if="${r.chartSvg() != null and !r.chartSvg().isEmpty()}">
+    <div class="chart-box" th:utext="${r.chartSvg()}"></div>
+  </section>
+
+  <!-- ===== The table ===== -->
+  <section class="card">
+    <h2 th:text="${r.def().title()} + ' ' + ${r.year()}">Profit &amp; loss 2026</h2>
+    <p class="muted" th:if="${r.table().rows().isEmpty()}">Nothing recorded for this year.</p>
+    <div class="table-scroll" th:if="${!r.table().rows().isEmpty()}">
+      <table class="table report">
+        <thead>
+        <tr>
+          <th></th>
+          <th class="num" th:each="c : ${r.table().columns()}" th:text="${c}">Jan</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="row : ${r.table().rows()}" th:classappend="${row.css()}">
+          <td th:if="${row.isSection()}" th:attr="colspan=${r.table().columns().size() + 1}" th:text="${row.label()}">Revenue</td>
+          <th:block th:unless="${row.isSection()}">
+            <td th:text="${row.label()}">Padel</td>
+            <td class="num" th:each="c : ${row.cells()}" th:classappend="${row.cellCss(c)}" th:text="${c.display()}">0</td>
+          </th:block>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted small" th:if="${r.note() != null}" th:text="${r.note()}">note</p>
+  </section>
+</main>
+</body>
+</html>

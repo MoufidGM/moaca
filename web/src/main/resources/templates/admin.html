@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Administration')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('admin')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Administration</h1>
+    <a class="btn btn-secondary" th:href="@{/admin/audit}">Audit log</a>
+    <a class="btn btn-primary" th:href="@{/admin/users/new}">+ New account</a>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <!-- ===== Accounts ===== -->
+  <section class="card" id="accounts">
+    <h2>Accounts</h2>
+    <table class="table">
+      <thead>
+      <tr><th>Username</th><th>Name</th><th>Role</th><th>Two-factor</th><th>Last sign-in</th><th>State</th></tr>
+      </thead>
+      <tbody>
+      <tr th:each="u : ${users}" th:classappend="${!u.enabled()} ? 'row-muted'">
+        <td><a th:href="@{/admin/users/{id}(id=${u.id()})}" th:text="${u.username()}">mo</a>
+          <span class="tag" th:if="${u.id() == me}">you</span></td>
+        <td th:text="${u.displayName()}">Moufid</td>
+        <td th:text="${u.role().label()}">Super admin</td>
+        <td>
+          <span th:if="${u.totpEnabled()}">on</span>
+          <span class="muted" th:if="${!u.totpEnabled() and u.role().requiresTwoFactor()}">to enroll at next sign-in</span>
+          <span class="muted" th:if="${!u.totpEnabled() and !u.role().requiresTwoFactor()}">—</span>
+        </td>
+        <td class="muted" th:text="${u.lastLoginAt() != null} ? ${#strings.replace(#strings.substring(u.lastLoginAt(), 0, 16), 'T', ' ')} + ' UTC' : 'never'">never</td>
+        <td>
+          <span class="status status-rejected" th:if="${!u.enabled()}">off</span>
+          <span class="status status-pending" th:if="${u.enabled() and u.isLocked(now)}">locked</span>
+          <span class="status status-pending" th:if="${u.enabled() and !u.isLocked(now) and u.passwordChangeRequired()}">temporary password</span>
+          <span class="status status-approved" th:if="${u.enabled() and !u.isLocked(now) and !u.passwordChangeRequired()}">active</span>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+    <p class="muted small">Accounts are switched off, never deleted, so their name stays on what they entered.
+      Forgotten password, lost phone or a locked account: open the account.</p>
+  </section>
+
+  <!-- ===== Categories ===== -->
+  <section class="card" id="categories">
+    <h2>Expense categories</h2>
+    <p class="muted small">Receptionists only see categories that are not marked <em>admins only</em>. The heading decides
+      where the category's expenses appear in each activity's cost breakdown.</p>
+    <table class="table">
+      <thead>
+      <tr><th>Category</th><th>Heading</th><th>Admins only</th><th>In use</th><th>Position</th><th class="num">Expenses</th><th></th></tr>
+      </thead>
+      <tbody>
+      <tr th:each="c : ${categories}" th:classappend="${!c.active()} ? 'row-muted'">
+        <td th:text="${c.name()}">Supplies</td>
+        <td>
+          <select name="heading" th:form="'cat-' + ${c.id()}" aria-label="Heading">
+            <option th:each="h : ${headings}" th:value="${h[0]}" th:text="${h[1]}" th:selected="${h[0] == c.heading()}">Other</option>
+          </select>
+        </td>
+        <td><input type="checkbox" name="adminOnly" value="true" th:form="'cat-' + ${c.id()}" th:checked="${c.adminOnly()}" aria-label="Admins only"></td>
+        <td><input type="checkbox" name="active" value="true" th:form="'cat-' + ${c.id()}" th:checked="${c.active()}" aria-label="In use"></td>
+        <td><input type="text" name="sortOrder" inputmode="numeric" maxlength="4" class="order-input" th:form="'cat-' + ${c.id()}" th:value="${c.sortOrder()}" aria-label="Position"></td>
+        <td class="num" th:text="${c.used()}">12</td>
+        <td><button type="submit" th:form="'cat-' + ${c.id()}" class="btn btn-secondary">Save</button></td>
+      </tr>
+      </tbody>
+    </table>
+    <!-- One form per row; the inputs above point at it with form="cat-<id>" -->
+    <form th:each="c : ${categories}" th:action="@{/admin/categories/{id}(id=${c.id()})}" method="post" th:id="'cat-' + ${c.id()}"></form>
+    <h2 class="spaced">Add a category</h2>
+    <form th:action="@{/admin/categories/new}" method="post" class="inline-form">
+      <label class="field grow"><span>Name</span><input type="text" name="name" required maxlength="60"></label>
+      <label class="field"><span>Heading</span>
+        <select name="heading">
+          <option th:each="h : ${headings}" th:value="${h[0]}" th:text="${h[1]}" th:selected="${h[0] == 'OTHER'}">Other</option>
+        </select>
+      </label>
+      <label class="field"><span>Position</span><input type="text" name="sortOrder" inputmode="numeric" maxlength="4" value="100" class="order-input"></label>
+      <label class="check inline-check"><input type="checkbox" name="adminOnly" value="true"> admins only</label>
+      <button type="submit" class="btn btn-primary">Add</button>
+    </form>
+    <p class="muted small">Activities and how their costs are shared are managed on <a th:href="@{/activities/settings}">Activity settings</a>.</p>
+  </section>
+
+  <!-- ===== Frequent expenses ===== -->
+  <section class="card" id="presets">
+    <h2>Frequent expenses</h2>
+    <p class="muted small">The one-tap buttons on the expense form. Admins add one from any expense (<em>Add to frequent expenses</em> on its
+      page); switch off the ones no longer needed.</p>
+    <p class="muted" th:if="${presets.isEmpty()}">None yet.</p>
+    <table class="table" th:if="${!presets.isEmpty()}">
+      <thead><tr><th>Button</th><th>Category</th><th>Activity</th><th class="num">Amount</th><th>Money from</th><th>On</th><th></th></tr></thead>
+      <tbody>
+      <tr th:each="p : ${presets}" th:classappend="${!p.active()} ? 'row-muted'">
+        <td th:text="${p.name()}">Nettoyage</td>
+        <td th:text="${p.category()}">Cleaning</td>
+        <td th:text="${p.activity()}">General</td>
+        <td class="num" th:text="${p.amount() != null} ? ${#numbers.formatDecimal(p.amount(), 1, 'COMMA', 0, 'POINT')} : '—'">350</td>
+        <td th:text="${p.paidFrom()}">RECEPTION</td>
+        <td><input type="checkbox" name="active" value="true" th:form="'preset-' + ${p.id()}" th:checked="${p.active()}" aria-label="On"></td>
+        <td><button type="submit" th:form="'preset-' + ${p.id()}" class="btn btn-secondary">Save</button></td>
+      </tr>
+      </tbody>
+    </table>
+    <form th:each="p : ${presets}" th:action="@{/admin/presets/{id}(id=${p.id()})}" method="post" th:id="'preset-' + ${p.id()}"></form>
+  </section>
+
+  <!-- ===== Settings ===== -->
+  <section class="card" id="settings">
+    <h2>Reception balance and the new year</h2>
+    <form th:action="@{/admin/settings/year-mode}" method="post">
+      <label class="check"><input type="radio" name="mode" value="CARRY" th:checked="${!resetEachYear}">
+        <span><strong>Carry over</strong> — the reception balance keeps accumulating from one year to the next.</span></label>
+      <label class="check"><input type="radio" name="mode" value="RESET" th:checked="${resetEachYear}">
+        <span><strong>Restart every 1 January</strong> — the balance shown counts this year's income and movements only.</span></label>
+      <button type="submit" class="btn btn-secondary">Save</button>
+    </form>
+    <p class="muted small">Shared with the desktop app. The safe never resets.</p>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Verification code')}"></head>
+<body class="auth-page">
+<main class="auth">
+  <div class="card auth-card">
+    <div class="auth-brand">CSLSM</div>
+    <h1>Verification code</h1>
+    <p class="muted">Open your authenticator app and enter the 6-digit code for CSLSM.</p>
+
+    <p class="alert alert-error" th:if="${param.error}">That code is not valid. Wait for the next one and try again.</p>
+
+    <form th:action="@{/2fa}" method="post">
+      <label class="field">
+        <span>Code</span>
+        <input class="code-input" type="text" name="code" inputmode="numeric" pattern="[0-9 ]{6,7}"
+               maxlength="7" autocomplete="one-time-code" required autofocus>
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Verify</button>
+    </form>
+
+    <form th:action="@{/logout}" method="post" class="auth-cancel">
+      <button type="submit" class="btn-link">Cancel and sign out</button>
+    </form>
+  </div>
+</main>
+</body>
+</html>

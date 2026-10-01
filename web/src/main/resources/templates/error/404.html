@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Not found')}"></head>
+<body class="auth-page">
+<main class="auth">
+  <div class="card auth-card">
+    <div class="auth-brand">CSLSM</div>
+    <h1>Page not found</h1>
+    <p class="muted">This page does not exist.</p>
+    <a class="btn btn-primary btn-block" th:href="@{/}">Back to the app</a>
+  </div>
+</main>
+</body>
+</html>

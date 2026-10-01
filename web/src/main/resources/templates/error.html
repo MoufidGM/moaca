@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Error')}"></head>
+<body class="auth-page">
+<main class="auth">
+  <div class="card auth-card">
+    <div class="auth-brand">CSLSM</div>
+    <h1>Something went wrong</h1>
+    <p class="muted">The error has been logged on the server. Try again, and tell the administrator if it keeps happening.</p>
+    <a class="btn btn-primary btn-block" th:href="@{/}">Back to the app</a>
+  </div>
+</main>
+</body>
+</html>

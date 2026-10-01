@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Tiki Taka')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('restaurant')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Tiki Taka</h1>
+    <span class="muted">Restaurant — daily sales and its own till</span>
+    <a class="btn btn-primary" th:href="@{/expenses/new}">+ Restaurant expense</a>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <section class="grid grid-2">
+    <!-- ===== Today's sales ===== -->
+    <article class="card">
+      <h2>Sales of the day</h2>
+      <p class="muted small">Either <a th:href="@{/daily-logs}">upload the day's file</a> (TT-dd-MM-yyyy.xlsx, from the
+        <a th:href="@{/daily-logs/template/restaurant}">template</a>), or type the day's totals here.</p>
+      <p class="muted small">Enter the day's takings when the restaurant closes. Entering a day again replaces its figures.</p>
+      <form th:action="@{/restaurant/sales}" method="post" class="form">
+        <div class="form-grid">
+          <label class="field"><span>Day</span>
+            <input type="date" name="date" th:value="${today}" th:attr="min=${minDate},max=${today}" required></label>
+          <label class="field"><span>Covers (optional)</span>
+            <input type="text" name="covers" inputmode="numeric" maxlength="5" th:value="${todaySale != null and todaySale.covers() != null} ? ${todaySale.covers()} : ''"></label>
+          <label class="field"><span>Cash</span>
+            <input type="text" name="cash" inputmode="decimal" maxlength="20" required th:value="${todaySale != null} ? ${#numbers.formatDecimal(todaySale.cash(), 1, 'POINT', 2, 'POINT')} : ''"></label>
+          <label class="field"><span>Card</span>
+            <input type="text" name="card" inputmode="decimal" maxlength="20" required th:value="${todaySale != null} ? ${#numbers.formatDecimal(todaySale.card(), 1, 'POINT', 2, 'POINT')} : ''"></label>
+          <label class="field span-2"><span>Note (optional)</span>
+            <input type="text" name="note" maxlength="200" th:value="${todaySale != null} ? ${todaySale.note()} : ''" placeholder="e.g. group booking, closed at noon"></label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" th:text="${todaySale != null} ? 'Update today' : 'Record today'">Record</button>
+        </div>
+      </form>
+    </article>
+
+    <!-- ===== Till (admins) ===== -->
+    <article class="card" th:if="${isAdmin}">
+      <div class="card-head">
+        <h2>Restaurant till <span class="muted small" th:text="'(' + ${till.scopeLabel} + ')'">(all time)</span></h2>
+        <button th:replace="~{fragments :: eye('restaurant')}"></button>
+      </div>
+      <div class="big-amount" data-secret="restaurant"
+           th:attr="data-value=${#numbers.formatDecimal(till.balance(), 1, 'COMMA', 0, 'POINT')}">•••••</div>
+      <table class="table breakdown">
+        <tbody>
+        <tr><td>Cash sales</td><td class="num" data-secret="restaurant" th:attr="data-value='+' + ${#numbers.formatDecimal(till.cashSales, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Deposits</td><td class="num" data-secret="restaurant" th:attr="data-value='+' + ${#numbers.formatDecimal(till.deposits, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Expenses paid from the till</td><td class="num" data-secret="restaurant" th:attr="data-value='−' + ${#numbers.formatDecimal(till.expensesPaid, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Moved to the safe</td><td class="num" data-secret="restaurant" th:attr="data-value='−' + ${#numbers.formatDecimal(till.movedToSafe, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        <tr><td>Sent to bank / withdrawals</td><td class="num" data-secret="restaurant" th:attr="data-value='−' + ${#numbers.formatDecimal(till.sentToBank + till.withdrawals, 1, 'COMMA', 0, 'POINT')}">•••••</td></tr>
+        </tbody>
+      </table>
+      <p class="small">Tiki Taka bank account:
+        <strong data-secret="restaurant" th:attr="data-value=${#numbers.formatDecimal(bank.balance(), 1, 'COMMA', 0, 'POINT')}">•••••</strong>
+        <span class="muted" th:text="'— card sales ' + ${#numbers.formatDecimal(bank.cardAndCheque, 1, 'COMMA', 0, 'POINT')} + ', cash brought ' + ${#numbers.formatDecimal(bank.cashDeposited, 1, 'COMMA', 0, 'POINT')} + ', paid from it ' + ${#numbers.formatDecimal(bank.expensesPaid, 1, 'COMMA', 0, 'POINT')}">detail</span>
+        <a th:href="@{/reserves#bank}">Statement, transfers →</a></p>
+      <form th:action="@{/restaurant/movements}" method="post" class="inline-form">
+        <label class="field grow"><span>Record</span>
+          <select name="action" required>
+            <option th:each="a : ${actions}" th:value="${a.name()}" th:text="${a.label}">Move</option>
+          </select></label>
+        <label class="field"><span>Date</span><input type="date" name="date" th:value="${today}" th:attr="max=${today}" required></label>
+        <label class="field"><span>Amount</span><input type="text" name="amount" inputmode="decimal" required maxlength="20"></label>
+        <label class="field grow"><span>Note</span><input type="text" name="note" maxlength="150"></label>
+        <button type="submit" class="btn btn-secondary">Record</button>
+      </form>
+    </article>
+  </section>
+
+  <!-- ===== Month ===== -->
+  <section class="card">
+    <div class="card-head">
+      <h2>
+        <a class="btn btn-secondary" th:href="@{/restaurant(month=${prevMonth})}" aria-label="Previous month">‹</a>
+        <span th:text="${monthLabel}">September 2026</span>
+        <a class="btn btn-secondary" th:href="@{/restaurant(month=${nextMonth})}" aria-label="Next month">›</a>
+      </h2>
+      <span class="muted" th:text="${daysEntered} + ' day(s) entered'">days</span>
+    </div>
+    <div class="grid grid-3">
+      <div class="stat"><div class="stat-label">Sales</div>
+        <div class="stat-value" th:text="${#numbers.formatDecimal(cashTotal + cardTotal, 1, 'COMMA', 0, 'POINT')}">0</div>
+        <div class="stat-sub" th:text="'cash ' + ${#numbers.formatDecimal(cashTotal, 1, 'COMMA', 0, 'POINT')} + ' · card ' + ${#numbers.formatDecimal(cardTotal, 1, 'COMMA', 0, 'POINT')}">split</div></div>
+      <div class="stat"><div class="stat-label">Restaurant expenses</div>
+        <div class="stat-value" th:text="${#numbers.formatDecimal(expensesTotal, 1, 'COMMA', 0, 'POINT')}">0</div>
+        <div class="stat-sub" th:text="${expenseCount} + ' expense(s)'">n</div></div>
+      <div class="stat" th:if="${isAdmin}"><div class="stat-label">Sales minus expenses</div>
+        <div class="stat-value" th:classappend="${cashTotal + cardTotal - expensesTotal < 0} ? 'negative' : 'positive'"
+             th:text="${#numbers.formatDecimal(cashTotal + cardTotal - expensesTotal, 1, 'COMMA', 0, 'POINT')}">0</div>
+        <div class="stat-sub"><a th:href="@{/activities/detail(name='Tiki Taka',period='month')}">full analysis with shared costs →</a></div></div>
+    </div>
+    <table class="table" th:if="${!sales.isEmpty()}">
+      <thead><tr><th>Day</th><th class="num">Cash</th><th class="num">Card</th><th class="num">Total</th><th class="num">Covers</th><th>Note</th><th>By</th><th th:if="${isAdmin}"></th></tr></thead>
+      <tbody>
+      <tr th:each="s : ${sales}">
+        <td class="nowrap" th:text="${#temporals.format(s.date(), 'EEE d MMM')}">Mon 1 Sep</td>
+        <td class="num" th:text="${#numbers.formatDecimal(s.cash(), 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:text="${#numbers.formatDecimal(s.card(), 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num strong" th:text="${#numbers.formatDecimal(s.total(), 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:text="${s.covers() != null} ? ${s.covers()} : ''">0</td>
+        <td th:text="${s.note()}">note</td>
+        <td th:text="${s.enteredBy()}">chef</td>
+        <td th:if="${isAdmin}">
+          <form th:action="@{/restaurant/sales/delete}" method="post" class="inline" data-confirm="Delete this day's sales?">
+            <input type="hidden" name="date" th:value="${s.date()}">
+            <button type="submit" class="btn-link" aria-label="Delete">✕</button>
+          </form>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+    <p class="muted" th:if="${sales.isEmpty()}">No sales entered this month.</p>
+  </section>
+
+  <section class="card" th:if="${isAdmin and !movements.isEmpty()}">
+    <h2>Till movements</h2>
+    <table class="table">
+      <thead><tr><th>Date</th><th>Type</th><th>Note</th><th class="num">Amount</th></tr></thead>
+      <tbody>
+      <tr th:each="m : ${movements}">
+        <td class="nowrap" th:text="${#temporals.format(m.date, 'd MMM yyyy')}">date</td>
+        <td th:text="${m.label}">Deposit</td>
+        <td th:text="${m.note}">note</td>
+        <td class="num" data-secret="restaurant" th:attr="data-value=${#numbers.formatDecimal(m.signedAmount(), 1, 'COMMA', 0, 'POINT')}">•••••</td>
+      </tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

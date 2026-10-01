@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${pageTitle})}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('expenses')}"></header>
+
+<main class="page page-narrow">
+  <div class="page-head">
+    <h1 th:text="${existing == null} ? 'New expense' : 'Edit expense #' + ${existing.id()}">New expense</h1>
+    <a class="btn-link" th:href="${existing == null} ? @{/expenses} : @{/expenses/{id}(id=${existing.id()})}">Cancel</a>
+  </div>
+
+  <div class="alert alert-error multiline" th:if="${error != null}">
+    <span th:text="${error}">Problem</span>
+    <span th:if="${existing == null}"><br>If you attached a receipt, choose it again.</span>
+  </div>
+
+  <p class="alert alert-info" th:if="${!isAdmin and existing == null}">
+    Your expense will be checked by an admin before it counts. Salaries, bills and rent are entered by an admin.
+  </p>
+
+  <section class="card" th:if="${!presets.isEmpty()}">
+    <h2>Frequent expenses — one tap fills the form</h2>
+    <ul class="presets">
+      <li th:each="p : ${presets}">
+        <a th:href="@{/expenses/new(preset=${p.id()})}"><span th:text="${p.name()}">Nettoyage</span>
+          <span class="preset-amount" th:if="${p.amount() != null}" th:text="${#numbers.formatDecimal(p.amount(), 1, 'COMMA', 0, 'POINT')}">350</span></a>
+      </li>
+    </ul>
+  </section>
+
+  <form class="card form" method="post" enctype="multipart/form-data"
+        th:action="${existing == null} ? @{/expenses/new} : @{/expenses/{id}/edit(id=${existing.id()})}"
+        th:object="${form}">
+    <div class="form-grid">
+      <label class="field">
+        <span>Date</span>
+        <input type="date" th:field="*{date}" th:attr="min=${minDate},max=${maxDate}" required>
+      </label>
+      <label class="field">
+        <span>Amount</span>
+        <input type="text" inputmode="decimal" th:field="*{amount}" placeholder="e.g. 250 or 1 250,50" required
+               autocomplete="off" maxlength="20">
+      </label>
+      <label class="field">
+        <span>Category</span>
+        <select th:field="*{category}" required>
+          <option value="">— choose —</option>
+          <option th:each="c : ${categories}" th:value="${c.name()}" th:text="${c.name()}">Supplies</option>
+        </select>
+      </label>
+      <label class="field" th:unless="${isRestaurant}">
+        <span>For which activity</span>
+        <select th:field="*{activity}" required>
+          <optgroup th:each="g : ${activityGroups}" th:label="${g.key}">
+            <option th:each="a : ${g.value}" th:value="${a.name()}" th:text="${a.name()}">General</option>
+          </optgroup>
+        </select>
+      </label>
+      <div class="field" th:if="${isRestaurant}">
+        <span>For which activity</span>
+        <div class="rule-fixed">Tiki Taka (restaurant)</div>
+      </div>
+      <label class="field" th:if="${!employees.isEmpty()}">
+        <span>Employee — for salaries and advances</span>
+        <select th:field="*{employeeId}">
+          <option value="">—</option>
+          <option th:each="e : ${employees}" th:value="${e.id()}" th:text="${e.name()} + (${e.job() != null} ? ' · ' + ${e.job()} : '')">Name</option>
+        </select>
+        <span class="muted small">The expense is then counted like the employee's pay (see Staff).</span>
+      </label>
+      <label class="field span-2">
+        <span>Description — what was bought or paid, and to whom</span>
+        <input type="text" th:field="*{description}" maxlength="300" required>
+      </label>
+      <label class="field">
+        <span>Paid by</span>
+        <select th:field="*{paymentMethod}">
+          <option value="CASH">Cash</option>
+          <option value="CARD">Card</option>
+          <option value="CHEQUE">Cheque</option>
+          <option value="TRANSFER">Transfer</option>
+        </select>
+      </label>
+      <label class="field" th:if="${isAdmin}">
+        <span>Money came from</span>
+        <select th:field="*{paidFrom}">
+          <option value="RECEPTION">Reception till</option>
+          <option value="RESTAURANT">Restaurant till (Tiki Taka)</option>
+          <option value="SAFE">Safe</option>
+          <option value="BANK">Association bank account</option>
+          <option value="RESTAURANT_BANK">Tiki Taka bank account</option>
+        </select>
+      </label>
+      <label class="field span-2" th:if="${existing == null}">
+        <span>Receipt — photo or PDF (optional, up to 10 MB each)</span>
+        <input type="file" name="receipts" accept="image/*,application/pdf" multiple data-max-mb="10">
+      </label>
+    </div>
+
+    <details class="split-box" th:if="${isAdmin}" th:open="${form.hasSplit()}">
+      <summary>Split across several activities (optional)</summary>
+      <p class="muted small">For a cost several activities share in a known proportion — e.g. an electricity bill
+        60% Terrain, 40% Gym. The percentages must add up to 100. Leave empty to charge the whole amount to the
+        activity above.</p>
+      <div class="split-row" th:each="row : ${form.splitRows}">
+        <select name="splitActivity" aria-label="Activity">
+          <option value="">—</option>
+          <optgroup th:each="g : ${activityGroups}" th:label="${g.key}">
+            <option th:each="a : ${g.value}" th:value="${a.name()}" th:text="${a.name()}"
+                    th:selected="${#strings.equalsIgnoreCase(a.name(), row[0])}">Terrain</option>
+          </optgroup>
+        </select>
+        <input type="text" name="splitPercent" inputmode="decimal" maxlength="6" placeholder="%" th:value="${row[1]}"
+               aria-label="Percentage">
+        <span class="muted">%</span>
+      </div>
+    </details>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary" th:text="${existing == null} ? 'Save expense' : 'Save changes'">Save</button>
+    </div>
+  </form>
+</main>
+</body>
+</html>

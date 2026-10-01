@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Expense')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('expenses')}"></header>
+
+<main class="page page-narrow">
+  <div class="page-head">
+    <h1 th:text="'Expense #' + ${e.id()}">Expense #1</h1>
+    <span class="status" th:classappend="'status-' + ${#strings.toLowerCase(e.status())}" th:text="${e.statusLabel()}">Approved</span>
+    <a class="btn-link" th:href="@{/expenses}">Back to expenses</a>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <p class="alert alert-error" th:if="${e.isRejected() and e.rejectionReason() != null}"
+     th:text="'Rejected: ' + ${e.rejectionReason()}">Rejected: reason</p>
+
+  <section class="card">
+    <div class="big-amount" th:text="${#numbers.formatDecimal(e.amount(), 1, 'COMMA', 2, 'POINT')}">0.00</div>
+    <dl class="details">
+      <dt>Date</dt><dd th:text="${#temporals.format(e.date(), 'EEEE d MMMM yyyy')}">date</dd>
+      <dt>Category</dt><dd th:text="${e.category()}">Supplies</dd>
+      <dt>Description</dt><dd th:text="${e.description()}">desc</dd>
+      <dt>Activity</dt>
+      <dd th:if="${splits.isEmpty()}" th:text="${e.activity()}">General</dd>
+      <dd th:if="${!splits.isEmpty()}">
+        <span th:each="s, it : ${splits}">
+          <span th:text="${s.activity()} + ' ' + ${#numbers.formatDecimal(s.percent(), 1, 'COMMA', 0, 'POINT')} + '% ('
+                        + ${#numbers.formatDecimal(e.amount() * s.percent() / 100, 1, 'COMMA', 2, 'POINT')} + ')'">Terrain 60% (600.00)</span><span th:if="${!it.last}">, </span>
+        </span>
+      </dd>
+      <dt>Paid by</dt><dd th:text="${e.paymentLabel()}">Cash</dd>
+      <dt>Money came from</dt><dd th:text="${e.paidFromLabel()}">Reception</dd>
+      <dt th:if="${e.employeeName() != null}">Employee</dt><dd th:if="${e.employeeName() != null}" th:text="${e.employeeName()}">name</dd>
+      <dt>Entered by</dt><dd th:text="${e.enteredBy()}">name</dd>
+      <dt th:if="${e.approvedBy() != null}" th:text="${e.isRejected()} ? 'Rejected by' : 'Approved by'">Approved by</dt>
+      <dd th:if="${e.approvedBy() != null}" th:text="${e.approvedBy()}">name</dd>
+    </dl>
+
+    <div class="form-actions">
+      <a class="btn btn-secondary" th:if="${canEdit}" th:href="@{/expenses/{id}/edit(id=${e.id()})}">Edit</a>
+      <form th:if="${canEdit or isAdmin}" th:action="@{/expenses/{id}/delete(id=${e.id()})}" method="post" class="inline"
+            data-confirm="Delete this expense and its receipts? This cannot be undone.">
+        <button type="submit" class="btn btn-danger">Delete</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===== Admin decisions ===== -->
+  <section class="card" th:if="${isAdmin and e.isPending()}">
+    <h2>Approve or reject</h2>
+    <div class="form-actions">
+      <form th:action="@{/expenses/{id}/approve(id=${e.id()})}" method="post" class="inline">
+        <button type="submit" class="btn btn-primary">Approve</button>
+      </form>
+    </div>
+    <form th:action="@{/expenses/{id}/reject(id=${e.id()})}" method="post" class="reject-form">
+      <label class="field">
+        <span>Or reject — reason for the receptionist</span>
+        <input type="text" name="reason" maxlength="300" required placeholder="e.g. wrong amount, receipt missing">
+      </label>
+      <button type="submit" class="btn btn-danger">Reject</button>
+    </form>
+  </section>
+
+  <section class="card" th:if="${isAdmin and !e.isRejected()}">
+    <h2>Frequent expense</h2>
+    <form th:action="@{/expenses/{id}/preset(id=${e.id()})}" method="post" class="inline-form">
+      <label class="field grow"><span>Name on the button</span>
+        <input type="text" name="name" maxlength="60" th:value="${e.description()}"></label>
+      <button type="submit" class="btn btn-secondary">Add to frequent expenses</button>
+    </form>
+    <p class="muted small">Puts a one-tap button on the expense form with this category, activity, amount and source. Receptionists see it
+      only if the category is open to them.</p>
+  </section>
+
+  <section class="card callout-warn" th:if="${isAdmin and !e.isRejected() and e.paidFrom() != 'BANK' and e.paidFrom() != 'RESTAURANT_BANK' and e.paidFrom() != 'RESTAURANT'}">
+    <h2>Is this really an expense?</h2>
+    <p class="muted">
+      Money taken to the bank (“versement au compte”) is not an expense — it only moves cash from the
+      <span th:text="${#strings.toLowerCase(e.paidFromLabel())}">reception</span> to the bank.
+      Moving it to bank deposits takes it out of the profit figures; the cash balance does not change.
+    </p>
+    <form th:action="@{/expenses/{id}/bank-deposit(id=${e.id()})}" method="post"
+          data-confirm="Record this as money sent to the bank instead of an expense?">
+      <button type="submit" class="btn" th:classappend="${e.looksLikeBankDeposit()} ? 'btn-primary' : 'btn-secondary'">This is a bank deposit</button>
+    </form>
+  </section>
+
+  <!-- ===== Receipts ===== -->
+  <section class="card">
+    <h2>Receipts</h2>
+    <p class="muted" th:if="${attachments.isEmpty()}">No receipt attached.</p>
+    <ul class="receipts" th:if="${!attachments.isEmpty()}">
+      <li th:each="a : ${attachments}">
+        <a th:href="@{/expenses/receipts/{aid}(aid=${a.id()})}" target="_blank" rel="noopener">
+          <img th:if="${a.isImage()}" th:src="@{/expenses/receipts/{aid}(aid=${a.id()})}" alt="Receipt" class="receipt-thumb">
+          <span th:text="${a.originalName()}">receipt.jpg</span>
+        </a>
+        <span class="muted small" th:text="${a.sizeLabel()}">120 KB</span>
+        <a class="small" th:href="@{/expenses/receipts/{aid}(aid=${a.id()},download=true)}">Download</a>
+        <form th:if="${canEdit}" th:action="@{/expenses/receipts/{aid}/delete(aid=${a.id()})}" method="post" class="inline"
+              data-confirm="Remove this receipt?">
+          <button type="submit" class="btn-link">Remove</button>
+        </form>
+      </li>
+    </ul>
+    <form th:if="${canEdit}" th:action="@{/expenses/{id}/receipts(id=${e.id()})}" method="post" enctype="multipart/form-data" class="inline-upload">
+      <input type="file" name="receipts" accept="image/*,application/pdf" multiple required data-max-mb="10">
+      <button type="submit" class="btn btn-secondary">Add receipt</button>
+    </form>
+  </section>
+</main>
+</body>
+</html>

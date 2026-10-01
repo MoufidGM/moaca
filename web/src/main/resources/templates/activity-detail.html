@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${d.activity().name})}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('activities')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1 th:text="${d.activity().name}">Terrain</h1>
+    <span class="tag" th:text="${d.isRevenue()} ? 'earns revenue' : (${d.isShared()} ? 'common cost, shared' : 'own line, costs only')">earns revenue</span>
+    <span class="muted" th:text="${period.label()}">period</span>
+    <a class="btn-link" th:href="@{/activities(period=${period.key()},from=${period.from()},to=${period.to()},spread=${spread})}">All activities</a>
+  </div>
+
+  <!-- ===== Period ===== -->
+  <section class="card filters">
+    <div class="filter-row">
+      <nav class="seg" aria-label="Period">
+        <a th:each="pk : ${presets}" th:href="@{/activities/detail(name=${d.activity().name},period=${pk[0]},spread=${spread})}"
+           th:text="${pk[1]}" th:classappend="${period.key() == pk[0]} ? 'active'">This year</a>
+      </nav>
+      <form th:action="@{/activities/detail}" method="get" class="inline-form">
+        <input type="hidden" name="name" th:value="${d.activity().name}">
+        <input type="hidden" name="period" value="custom">
+        <input type="hidden" name="spread" th:value="${spread}">
+        <label>From <input type="date" name="from" th:value="${period.from()}"></label>
+        <label>To <input type="date" name="to" th:value="${period.to()}"></label>
+        <button type="submit" class="btn btn-secondary">Show</button>
+      </form>
+    </div>
+  </section>
+
+  <p class="muted small" th:if="${!d.partOfNames().isEmpty()}"
+     th:text="'Includes expenses recorded as: ' + ${#strings.listJoin(d.partOfNames(), ', ')} + '.'">Includes…</p>
+
+  <!-- ===== Key figures: revenue activity ===== -->
+  <section class="grid grid-3" th:if="${d.isRevenue()}">
+    <article class="card stat">
+      <div class="stat-label">Revenue</div>
+      <div class="stat-value" th:text="${#numbers.formatDecimal(d.row().revenue, 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub" th:text="${#numbers.formatPercent(d.row().revenueShare, 1, 0)} + ' of the center · before: ' + ${#numbers.formatDecimal(d.previousRow().revenue, 1, 'COMMA', 0, 'POINT')}">share</div>
+    </article>
+    <article class="card stat">
+      <div class="stat-label">Costs</div>
+      <div class="stat-value" th:text="${#numbers.formatDecimal(d.row().costs, 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub" th:text="'direct ' + ${#numbers.formatDecimal(d.row().directCosts, 1, 'COMMA', 0, 'POINT')} + ' · common ' + ${#numbers.formatDecimal(d.row().sharedCosts, 1, 'COMMA', 0, 'POINT')}">split</div>
+    </article>
+    <article class="card stat stat-main">
+      <div class="stat-label">Profit</div>
+      <div class="stat-value" th:classappend="${d.row().profit < 0} ? 'negative' : 'positive'"
+           th:text="${#numbers.formatDecimal(d.row().profit, 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub">
+        <span th:if="${d.row().margin != null}" th:text="'margin ' + ${#numbers.formatPercent(d.row().margin, 1, 0)}">margin</span>
+        <span class="delta" th:if="${d.change() != null}" th:classappend="${d.change() >= 0} ? 'good' : 'bad'"
+              th:text="(${d.change() >= 0} ? '+' : '') + ${#numbers.formatPercent(d.change(), 1, 0)}">+5%</span>
+        <span th:if="${d.change() != null}">vs the period before</span>
+      </div>
+    </article>
+  </section>
+
+  <!-- ===== Key figures: cost-only or shared activity ===== -->
+  <section class="grid grid-3" th:unless="${d.isRevenue()}">
+    <article class="card stat">
+      <div class="stat-label">Costs</div>
+      <div class="stat-value" th:text="${#numbers.formatDecimal(d.ownCosts(), 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub">
+        <span th:text="${d.row().expenseCount} + ' expense(s)'">n</span>
+        <span class="delta" th:if="${d.change() != null}" th:classappend="${d.change() <= 0} ? 'good' : 'bad'"
+              th:text="(${d.change() >= 0} ? '+' : '') + ${#numbers.formatPercent(d.change(), 1, 0)}">+5%</span>
+        <span th:if="${d.change() != null}">vs the period before</span>
+      </div>
+    </article>
+    <article class="card stat" th:if="${d.isShared()}">
+      <div class="stat-label">How it counts</div>
+      <div class="stat-sub">Spread over the activities that earn revenue — see the table below.</div>
+    </article>
+    <article class="card stat" th:unless="${d.isShared()}">
+      <div class="stat-label">How it counts</div>
+      <div class="stat-sub">On its own line: no revenue is recorded for it. If it belongs to an activity that earns revenue,
+        set it as “part of” that activity in <a th:href="@{/activities/settings}">Activity settings</a>.</div>
+    </article>
+  </section>
+
+  <section class="card">
+    <h2 th:text="${d.isRevenue()} ? 'Revenue and costs, last 12 months' : 'Costs, last 12 months'">12 months</h2>
+    <div class="chart-box" th:utext="${d.chartSvg()}"></div>
+  </section>
+
+  <section class="grid grid-2">
+    <article class="card" th:if="${d.isRevenue()}">
+      <h2>Where the costs go</h2>
+      <p class="muted" th:if="${d.row().breakdown.isEmpty()}">No costs in this period.</p>
+      <table class="table" th:if="${!d.row().breakdown.isEmpty()}">
+        <tbody>
+        <tr th:each="h : ${d.row().breakdown}">
+          <td th:text="${h.key.label}">Salaries of its own staff</td>
+          <td class="num" th:text="${#numbers.formatDecimal(h.value, 1, 'COMMA', 0, 'POINT')}">0</td>
+          <td class="num muted small" th:text="${d.row().costs > 0} ? ${#numbers.formatPercent(h.value / d.row().costs, 1, 0)} : ''">0%</td>
+        </tr>
+        </tbody>
+        <tfoot><tr><td>Total costs</td><td class="num" th:text="${#numbers.formatDecimal(d.row().costs, 1, 'COMMA', 0, 'POINT')}">0</td><td></td></tr></tfoot>
+      </table>
+    </article>
+
+    <article class="card">
+      <h2>Costs by category</h2>
+      <p class="muted" th:if="${d.costByCategory().isEmpty()}">No direct costs in this period.</p>
+      <table class="table" th:if="${!d.costByCategory().isEmpty() or (d.isRevenue() and d.row().sharedCosts > 0)}">
+        <tbody>
+        <tr th:each="c : ${d.costByCategory()}">
+          <td th:text="${c.name}">Supplies</td>
+          <td class="num" th:text="${#numbers.formatDecimal(c.amount, 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        <tr th:if="${d.isRevenue() and d.row().sharedCosts > 0}" class="row-muted">
+          <td>Share of common costs</td>
+          <td class="num" th:text="${#numbers.formatDecimal(d.row().sharedCosts, 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tbody>
+      </table>
+    </article>
+
+    <article class="card" th:if="${d.isRevenue()}">
+      <h2>Average revenue by weekday</h2>
+      <p class="muted" th:if="${d.daysLogged() == 0}">No daily log in this period.</p>
+      <table class="table" th:if="${d.daysLogged() > 0}">
+        <tbody>
+        <tr th:each="w : ${d.weekdays()}">
+          <td th:text="${w.day()}">Monday</td>
+          <td class="num" th:text="${#numbers.formatDecimal(w.average(), 1, 'COMMA', 0, 'POINT')}">0</td>
+          <td class="num muted small" th:text="${w.days()} + ' days'">4 days</td>
+        </tr>
+        </tbody>
+      </table>
+      <p class="muted small" th:if="${d.daysWithoutRevenue() > 0}"
+         th:text="${d.daysWithoutRevenue()} + ' of ' + ${d.daysLogged()} + ' days had no revenue for this activity.'">n days</p>
+    </article>
+
+    <article class="card" th:if="${d.isShared()}">
+      <h2>How these costs were spread</h2>
+      <p class="muted" th:if="${d.sharedSpread().isEmpty()}">Not spread in this view.</p>
+      <table class="table" th:if="${!d.sharedSpread().isEmpty()}">
+        <tbody>
+        <tr th:each="s : ${d.sharedSpread()}">
+          <td th:text="${s.name}">Terrain</td>
+          <td class="num" th:text="${#numbers.formatDecimal(s.amount, 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tbody>
+      </table>
+    </article>
+  </section>
+
+  <section class="grid grid-2" th:if="${d.isRevenue() and !d.bestDays().isEmpty()}">
+    <article class="card">
+      <h2>Best days</h2>
+      <table class="table">
+        <tbody>
+        <tr th:each="x : ${d.bestDays()}">
+          <td th:text="${#temporals.format(x.date(), 'EEE d MMM yyyy')}">day</td>
+          <td class="num" th:text="${#numbers.formatDecimal(x.amount(), 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tbody>
+      </table>
+    </article>
+    <article class="card">
+      <h2>Weakest days (with revenue)</h2>
+      <table class="table">
+        <tbody>
+        <tr th:each="x : ${d.worstDays()}">
+          <td th:text="${#temporals.format(x.date(), 'EEE d MMM yyyy')}">day</td>
+          <td class="num" th:text="${#numbers.formatDecimal(x.amount(), 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tbody>
+      </table>
+    </article>
+  </section>
+
+  <section class="card">
+    <h2>Expenses</h2>
+    <p class="muted" th:if="${d.expenses().isEmpty()}">No expenses recorded for this activity in this period.</p>
+    <table class="table" th:if="${!d.expenses().isEmpty()}">
+      <thead><tr><th>Date</th><th>Category</th><th>Description</th><th class="num">Share</th><th class="num">Amount</th></tr></thead>
+      <tbody>
+      <tr th:each="x : ${d.expenses()}" th:classappend="${x.isPending()} ? 'row-warn'">
+        <td class="nowrap" th:text="${#temporals.format(x.date(), 'dd MMM yyyy')}">date</td>
+        <td th:text="${x.category()}">Supplies</td>
+        <td>
+          <a th:href="@{/expenses/{id}(id=${x.id()})}" th:text="${x.description() != null ? x.description() : '(no description)'}">desc</a>
+          <span class="tag" th:if="${!#strings.equalsIgnoreCase(x.activity(), d.activity().name)}" th:text="${x.activity()}">Events</span>
+          <span class="status status-pending" th:if="${x.isPending()}">Pending</span>
+        </td>
+        <td class="num" th:text="${x.isSplit()} ? ${#numbers.formatDecimal(x.percent(), 1, 'COMMA', 0, 'POINT')} + '%' : ''">60%</td>
+        <td class="num" th:text="${#numbers.formatDecimal(x.portion(), 1, 'COMMA', 2, 'POINT')}">0.00</td>
+      </tr>
+      </tbody>
+    </table>
+    <p class="muted small" th:if="${d.expensesTruncated()}">Showing the latest 300 — narrow the period to see older ones.</p>
+  </section>
+</main>
+</body>
+</html>

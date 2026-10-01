@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Today')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('today')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Today</h1>
+    <a class="btn btn-primary" th:href="@{/daily-logs}">Upload today's file</a>
+  </div>
+
+  <section class="grid grid-3">
+    <article class="card stat">
+      <div class="stat-label">Latest day imported</div>
+      <th:block th:if="${day != null}">
+        <div class="stat-value" th:text="${#numbers.formatDecimal(day.total, 1, 'COMMA', 0, 'POINT')}">0</div>
+        <div class="stat-sub" th:text="${#temporals.format(day.date, 'EEEE d MMMM yyyy')}">Monday</div>
+      </th:block>
+      <div class="stat-value muted" th:if="${day == null}">—</div>
+    </article>
+
+    <article class="card stat">
+      <div class="stat-label">This week</div>
+      <div class="stat-value" th:text="${#numbers.formatDecimal(view.weekTotal, 1, 'COMMA', 0, 'POINT')}">0</div>
+      <div class="stat-sub" th:text="${view.weekLabel}">Mon–Today</div>
+    </article>
+
+    <article class="card stat">
+      <div class="stat-label">Log files, last 7 days</div>
+      <div class="stat-value" th:classappend="${view.missingCount() > 0} ? 'warn'"
+           th:text="${view.missingCount() == 0} ? 'All in' : (${view.missingCount()} + ' missing')">All in</div>
+      <div class="stat-sub">Upload the day's file as soon as the day is closed</div>
+    </article>
+  </section>
+
+  <section class="grid grid-2">
+    <article class="card">
+      <h2>Latest day by activity</h2>
+      <p class="muted" th:if="${day == null}">No log file imported yet.</p>
+      <table class="table" th:if="${day != null}">
+        <tbody>
+        <tr th:each="a : ${day.activities}" th:if="${a.amount != 0}">
+          <td th:text="${a.name}">Activity</td>
+          <td class="num" th:text="${#numbers.formatDecimal(a.amount, 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tbody>
+        <tfoot>
+        <tr>
+          <td>Cash / Card / Cheque <span class="muted small">(departments, drinks aside)</span></td>
+          <td class="num"
+              th:text="${#numbers.formatDecimal(day.cash, 1, 'COMMA', 0, 'POINT')} + ' / ' + ${#numbers.formatDecimal(day.card, 1, 'COMMA', 0, 'POINT')} + ' / ' + ${#numbers.formatDecimal(day.cheque, 1, 'COMMA', 0, 'POINT')}">0</td>
+        </tr>
+        </tfoot>
+      </table>
+    </article>
+
+    <article class="card">
+      <h2>Last 7 days</h2>
+      <table class="table">
+        <tbody>
+        <tr th:each="d : ${view.lastSevenDays}" th:classappend="${d.missing()} ? 'row-missing'">
+          <td th:text="${#temporals.format(d.date, 'EEE d MMM')}">Mon 1 Jan</td>
+          <td class="num" th:if="${!d.missing()}" th:text="${#numbers.formatDecimal(d.total, 1, 'COMMA', 0, 'POINT')}">0</td>
+          <td class="num missing-label" th:if="${d.missing()}">no file</td>
+        </tr>
+        </tbody>
+      </table>
+    </article>
+  </section>
+</main>
+</body>
+</html>
