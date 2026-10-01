@@ -17,5 +17,5 @@ web-dev-files/
 
 # Exports of real figures and the packaged desktop app
 /*.csv
-CSLSM.zip
-CSLSM/
+/CSLSM.zip
+/CSLSM/
