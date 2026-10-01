@@ -27,7 +27,7 @@ expense splits and activity settings.
 - **Administration** (super admin). Accounts with temporary passwords, expense categories, the
   year-mode setting and the audit log viewer. Everyone can change their own password.
 
-It works on the same database as the desktop app. Migrations V9–V21 only *add* tables and
+It works on the same database as the desktop app. Migrations V9–V22 only *add* tables and
 columns (V16 also renames three activities), and the desktop app keeps working after them.
 
 ## Try it on your Mac
@@ -81,8 +81,13 @@ Days come from Excel files, one per unit, all uploaded on **Daily logs**:
 | File | For | Who uploads | What is read |
 |---|---|---|---|
 | `DL-dd-MM-yyyy.xlsx` | The center (the sheet in use since 2025) | Reception, admins | Department totals, cash/card/cheque, drinks |
-| `TT-dd-MM-yyyy.xlsx` | Tiki Taka | Restaurant manager, admins | Total sales, card, covers, note — cash is the rest |
+| `TT-dd-MM-yyyy.xlsx` | Tiki Taka | Reception, restaurant manager, admins | Total sales, card, covers, note — cash is the rest |
 | `SA-dd-MM-yyyy.xlsx` | The Salon | Reception, admins | Total sales, card, clients, note — cash is the rest |
+
+**What the reception sees:** Daily logs (the three files and the expense sheets) and Expenses
+(its own entries, manual or by sheet). No totals: Today, the Salon page and everything else
+with money are for admins. The restaurant manager sees Tiki Taka, Daily logs (TT- files) and
+Expenses.
 
 The Tiki Taka and Salon files start from the templates linked on the page (and on their own
 pages): a summary block the app reads, and a lines table (name, price, quantity) whose sum
@@ -95,6 +100,16 @@ day's totals directly for days without a file.
 Box and Danse are departments of their own (new columns, V20). The center's sheet does not have
 them yet; when it does, set `summary.col.box` and `summary.col.dance` in
 `daily-log-layout.properties` and they are read like the others.
+
+**Expense sheets** (Expenses → *Import sheet*, or from Daily logs): anyone can upload one, saying
+whether it is the center's, Tiki Taka's or the Salon's. Every row is checked and shown before
+anything is saved. An admin's rows are saved approved; the reception's and the manager's wait
+for approval like manual entries, come from the till (the restaurant's for Tiki Taka), and may
+only use the reception's categories. Tiki Taka's and the Salon's sheets land on their activity.
+
+**Uploaded files** (admins, *All uploaded files* on Daily logs or Administration): every daily
+log and expense sheet ever uploaded, sorted by the date it is for, with the file to download,
+who uploaded it and the result. Originals are kept on the server's data volume.
 
 **Frequent expenses:** on any expense, an admin presses *Add to frequent expenses*; the expense
 form then shows a one-tap button that fills category, activity, amount and source. The super

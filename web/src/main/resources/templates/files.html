@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Uploaded files')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar('daily-logs')}"></header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>Uploaded files</h1>
+    <span class="muted">Every daily log and expense sheet, by the day it is for. Originals are kept on the server.</span>
+  </div>
+
+  <div th:replace="~{fragments :: flash}"></div>
+
+  <form class="card filters" th:action="@{/files}" method="get">
+    <div class="filter-row">
+      <a class="btn btn-secondary" th:href="@{/files(month=${prevMonth},kind=${kind})}" aria-label="Previous month">‹</a>
+      <label>Month <input type="month" name="month" th:value="${month}"></label>
+      <a class="btn btn-secondary" th:href="@{/files(month=${nextMonth},kind=${kind})}" aria-label="Next month">›</a>
+      <label>Kind
+        <select name="kind">
+          <option value="" th:selected="${kind == ''}">All</option>
+          <option value="daily" th:selected="${kind == 'daily'}">Daily logs</option>
+          <option value="expenses" th:selected="${kind == 'expenses'}">Expense sheets</option>
+        </select>
+      </label>
+      <button type="submit" class="btn btn-secondary">Show</button>
+    </div>
+  </form>
+
+  <section class="card">
+    <h2 th:text="${monthLabel}">September 2026</h2>
+    <p class="muted" th:if="${rows.isEmpty()}">No files for this month.</p>
+    <table class="table" th:if="${!rows.isEmpty()}">
+      <thead><tr><th>Day</th><th>Kind</th><th>For</th><th>File</th><th>Result</th><th>Uploaded by</th><th>When</th><th></th></tr></thead>
+      <tbody>
+      <tr th:each="f : ${rows}">
+        <td class="nowrap" th:text="${#temporals.format(f.date(), 'EEE d MMM yyyy')}">Mon 1 Sep 2026</td>
+        <td th:text="${f.kind()}">Daily log</td>
+        <td th:text="${f.unit()}">Center</td>
+        <td th:text="${f.name()}">DL-01-09-2026.xlsx</td>
+        <td class="small" th:text="${f.result()}">Imported</td>
+        <td th:text="${f.by()}">desk</td>
+        <td class="nowrap small" th:text="${f.when()}">2026-09-01 20:10</td>
+        <td><a th:href="@{${f.link()}}">Download</a></td>
+      </tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

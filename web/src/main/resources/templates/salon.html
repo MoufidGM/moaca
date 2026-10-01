@@ -17,8 +17,9 @@
     <!-- ===== Today's sales ===== -->
     <article class="card">
       <h2>Sales of the day</h2>
-      <p class="muted small">Either <a th:href="@{/daily-logs}">upload the day's file</a> (SA-dd-MM-yyyy.xlsx, from the
-        <a th:href="@{/daily-logs/template/salon}">template</a>), or type the day's totals here.</p>
+      <p class="muted small">The reception uploads the day's file (SA-dd-MM-yyyy.xlsx, from the
+        <a th:href="@{/daily-logs/template/salon}">template</a>) on <a th:href="@{/daily-logs}">Daily logs</a>. Type a day's totals here
+        when there is no file for it.</p>
       <p class="muted small">Enter the Salon's takings at closing time. The cash goes into the reception till with the day's
         income; card payments go to the bank. Entering a day again replaces its figures.</p>
       <form th:action="@{/salon/sales}" method="post" class="form">
@@ -65,7 +66,7 @@
 
   <!-- ===== Days ===== -->
   <section class="card">
-    <h2 th:text="${isAdmin} ? 'Days of ' + ${monthLabel} : 'Last 14 days'">Days</h2>
+    <h2 th:text="'Days of ' + ${monthLabel}">Days</h2>
     <table class="table" th:if="${!sales.isEmpty()}">
       <thead><tr><th>Day</th><th class="num">Cash</th><th class="num">Card</th><th class="num">Total</th><th class="num">Clients</th><th>Note</th><th>By</th><th th:if="${isAdmin}"></th></tr></thead>
       <tbody>
@@ -87,7 +88,6 @@
       </tbody>
     </table>
     <p class="muted" th:if="${sales.isEmpty()}">No Salon sales entered yet.</p>
-    <p class="muted small" th:unless="${isAdmin}">You can correct the last 7 days; ask an admin for older ones.</p>
   </section>
 </main>
 </body>

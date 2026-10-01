@@ -16,11 +16,11 @@
 <header th:fragment="topbar(active)" class="topbar">
   <a class="brand" th:href="@{/}">CSLSM</a>
   <nav class="menu" aria-label="Main">
-    <a sec:authorize="hasAnyRole('RECEPTIONIST','ADMIN','SUPER_ADMIN')" th:href="@{/today}" th:classappend="${active == 'today'} ? 'active'">Today</a>
     <a th:href="@{/daily-logs}" th:classappend="${active == 'daily-logs'} ? 'active'">Daily logs</a>
-    <a sec:authorize="hasAnyRole('RESTAURANT_MANAGER','ADMIN','SUPER_ADMIN')" th:href="@{/restaurant}" th:classappend="${active == 'restaurant'} ? 'active'">Tiki Taka</a>
-    <a sec:authorize="hasAnyRole('RECEPTIONIST','ADMIN','SUPER_ADMIN')" th:href="@{/salon}" th:classappend="${active == 'salon'} ? 'active'">Salon</a>
     <a th:href="@{/expenses}" th:classappend="${active == 'expenses'} ? 'active'">Expenses</a>
+    <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/today}" th:classappend="${active == 'today'} ? 'active'">Today</a>
+    <a sec:authorize="hasAnyRole('RESTAURANT_MANAGER','ADMIN','SUPER_ADMIN')" th:href="@{/restaurant}" th:classappend="${active == 'restaurant'} ? 'active'">Tiki Taka</a>
+    <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/salon}" th:classappend="${active == 'salon'} ? 'active'">Salon</a>
     <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/dashboard}"
        th:classappend="${active == 'dashboard'} ? 'active'">Dashboard</a>
     <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/income}"

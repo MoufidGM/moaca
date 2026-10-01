@@ -17,16 +17,27 @@
     <p>Columns: <strong>Date | Category | Description | Amount | Payment | Entered by | Approved by | Activity | Paid from</strong>.
       You will see every row checked before anything is saved.</p>
     <p><a th:href="@{/expenses/import/template}">Download the template</a> (the Help sheet explains each column).</p>
-    <form th:action="@{/expenses/import}" method="post" enctype="multipart/form-data" class="inline-upload">
-      <input type="file" name="file" accept=".xlsx,.xls" required data-max-mb="5">
-      <button type="submit" class="btn btn-primary">Check the file</button>
+    <p class="alert alert-info" th:unless="${isAdmin}">Your rows will wait for an admin's approval, like expenses you type. They are
+      recorded as paid from the till; salaries, bills and rent are entered by an admin.</p>
+    <form th:action="@{/expenses/import}" method="post" enctype="multipart/form-data" class="form">
+      <div class="form-grid">
+        <div class="field" th:if="${units.size() > 1}"><span>This sheet is for</span>
+          <label class="check" th:each="u : ${units}">
+            <input type="radio" name="unit" th:value="${u}" th:checked="${u == 'CENTER'}">
+            <span th:text="${u == 'CENTER'} ? 'The center' : (${u == 'RESTAURANT'} ? 'Tiki Taka' : 'The Salon')">The center</span>
+          </label>
+        </div>
+        <input type="hidden" name="unit" th:if="${units.size() == 1}" th:value="${units[0]}">
+        <label class="field"><span>Excel file</span><input type="file" name="file" accept=".xlsx,.xls" required data-max-mb="5"></label>
+      </div>
+      <div class="form-actions"><button type="submit" class="btn btn-primary">Check the file</button></div>
     </form>
   </section>
 
   <th:block th:if="${preview != null}">
     <section class="card">
       <div class="card-head">
-        <h2 th:text="${preview.fileName()}">file.xlsx</h2>
+        <h2><span th:text="${preview.fileName()}">file.xlsx</span> <span class="muted small" th:text="'— ' + ${unitLabel}">— the center</span></h2>
         <span class="muted"
               th:text="${preview.okCount()} + ' rows ready (' + ${#numbers.formatDecimal(preview.okTotal(), 1, 'COMMA', 0, 'POINT')} + '), ' + ${preview.errorCount()} + ' with errors'">x</span>
       </div>
@@ -35,7 +46,7 @@
       </p>
       <form th:action="@{/expenses/import/confirm}" method="post" class="form-actions"
             th:if="${preview.okCount() > 0}"
-            th:attr="data-confirm='Import ' + ${preview.okCount()} + ' expenses as approved?'">
+            th:attr="data-confirm='Import ' + ${preview.okCount()} + ' expenses' + (${isAdmin} ? ' as approved?' : ' (to be approved by an admin)?')">
         <input type="hidden" name="token" th:value="${preview.token()}">
         <button type="submit" class="btn btn-primary" th:text="'Import ' + ${preview.okCount()} + ' rows'">Import</button>
         <a class="btn btn-secondary" th:href="@{/expenses/import}">Choose another file</a>

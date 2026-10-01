@@ -8,6 +8,8 @@
   <div class="page-head">
     <h1>Daily logs</h1>
     <span class="muted">Upload each day's file as soon as the day is closed.</span>
+    <a class="btn btn-secondary" th:if="${isAdmin}" th:href="@{/files}">All uploaded files</a>
+    <a class="btn btn-secondary" th:href="@{/expenses/import}">Expense sheet</a>
   </div>
 
   <div th:replace="~{fragments :: flash}"></div>

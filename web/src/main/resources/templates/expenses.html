@@ -8,7 +8,7 @@
   <div class="page-head">
     <h1>Expenses</h1>
     <a class="btn btn-primary" th:href="@{/expenses/new}">+ New expense</a>
-    <a class="btn btn-secondary" th:if="${isAdmin}" th:href="@{/expenses/import}">Import sheet</a>
+    <a class="btn btn-secondary" th:href="@{/expenses/import}">Import sheet</a>
   </div>
 
   <div th:replace="~{fragments :: flash}"></div>
