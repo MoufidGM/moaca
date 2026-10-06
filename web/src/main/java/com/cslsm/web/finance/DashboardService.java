@@ -59,7 +59,13 @@ public class DashboardService
 		}
 	}
 
+	/** One source of income: the center's departments, Tiki Taka, the Salon. */
+	public record UnitRow(String name, String detail, double amount, double share, Delta delta)
+	{
+	}
+
 	public record DashboardView(
+			List<UnitRow> units,
 			String periodLabel,
 			String compareLabel,
 			double income,
@@ -103,6 +109,7 @@ public class DashboardService
 		double prevExpenses = finance.expenses(prevStart, prevEnd);
 
 		return new DashboardView(
+				units(monthStart, today, prevStart, prevEnd, income),
 				range(monthStart, today),
 				"vs " + range(prevStart, prevEnd),
 				income,
@@ -125,6 +132,22 @@ public class DashboardService
 				finance.incomeByActivity(monthStart, today),
 				finance.topExpenseCategories(monthStart, today, 6),
 				finance.paymentMix(monthStart, today));
+	}
+
+	/** The month's income split by where it was earned, each against the same days of last month. */
+	private List<UnitRow> units(LocalDate from, LocalDate to, LocalDate prevFrom, LocalDate prevTo, double total)
+	{
+		double center = finance.dailyLogIncome(from, to);
+		double restaurant = finance.restaurantSales(from, to);
+		double salon = finance.salonSales(from, to);
+		List<UnitRow> rows = new ArrayList<>();
+		rows.add(new UnitRow("Sports center", "fields, subscriptions, park, shop, drinks — the daily log",
+				center, total == 0 ? 0 : center / total, Delta.of(center, finance.dailyLogIncome(prevFrom, prevTo), true)));
+		rows.add(new UnitRow("Tiki Taka", "restaurant sales, cash and card",
+				restaurant, total == 0 ? 0 : restaurant / total, Delta.of(restaurant, finance.restaurantSales(prevFrom, prevTo), true)));
+		rows.add(new UnitRow("Salon", "cash and card",
+				salon, total == 0 ? 0 : salon / total, Delta.of(salon, finance.salonSales(prevFrom, prevTo), true)));
+		return rows;
 	}
 
 	private String chart(LocalDate today)

@@ -92,7 +92,7 @@
   <!-- ===== Breakdown ===== -->
   <section class="grid grid-2">
     <article class="card">
-      <h2>By activity</h2>
+      <h2>By unit and activity</h2>
       <p class="muted" th:if="${view.activities.isEmpty()}">Nothing recorded in this period.</p>
       <table class="table" th:if="${!view.activities.isEmpty()}">
         <thead>
@@ -104,9 +104,16 @@
           <th class="num" th:if="${view.compare}">Change</th>
         </tr>
         </thead>
-        <tbody>
-        <tr th:each="a : ${view.activities}">
-          <td><a th:href="@{/activities/detail(name=${a.name()},period='custom',from=${p.from()},to=${p.to()})}" th:text="${a.name()}">Padel</a></td>
+        <tbody th:each="g : ${view.units}">
+        <tr class="group-head">
+          <td th:text="${g.name()}">Sports center</td>
+          <td class="num" th:text="${#numbers.formatDecimal(g.amount(), 1, 'COMMA', 0, 'POINT')}">0</td>
+          <td class="num" th:text="${#numbers.formatPercent(g.share(), 1, 0)}">0%</td>
+          <td class="num" th:if="${view.compare}" th:text="${#numbers.formatDecimal(g.previous(), 1, 'COMMA', 0, 'POINT')}">0</td>
+          <td class="num" th:if="${view.compare}"><span class="delta" th:if="${g.delta() != null}" th:classappend="${g.delta().css}" th:text="${g.delta().text}">+0%</span></td>
+        </tr>
+        <tr th:each="a : ${g.rows()}">
+          <td class="indent"><a th:href="@{/activities/detail(name=${a.name()},period='custom',from=${p.from()},to=${p.to()})}" th:text="${a.name()}">Padel</a></td>
           <td class="num" th:text="${#numbers.formatDecimal(a.amount(), 1, 'COMMA', 0, 'POINT')}">0</td>
           <td class="num" th:text="${#numbers.formatPercent(a.share(), 1, 0)}">0%</td>
           <td class="num" th:if="${view.compare}" th:text="${#numbers.formatDecimal(a.previous(), 1, 'COMMA', 0, 'POINT')}">0</td>
@@ -118,7 +125,7 @@
         </tbody>
         <tfoot>
         <tr>
-          <td>Total</td>
+          <td>Whole center</td>
           <td class="num" th:text="${#numbers.formatDecimal(view.total, 1, 'COMMA', 0, 'POINT')}">0</td>
           <td class="num">100%</td>
           <td class="num" th:if="${view.compare}" th:text="${#numbers.formatDecimal(view.previousTotal, 1, 'COMMA', 0, 'POINT')}">0</td>

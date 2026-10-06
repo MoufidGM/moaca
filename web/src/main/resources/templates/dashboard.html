@@ -6,9 +6,14 @@
 
 <main class="page">
   <div class="page-head">
-    <h1>Dashboard</h1>
+    <h1>The whole center this month</h1>
     <span class="muted" th:text="${view.periodLabel} + ' · ' + ${view.compareLabel}">1–29 Sep · vs 1–29 Aug</span>
+    <a class="btn btn-secondary" th:href="@{/income}">Income in detail</a>
+    <a class="btn btn-secondary" th:href="@{/activities}">Profit by activity</a>
   </div>
+
+  <!-- ===== 1. The bottom line ===== -->
+  <h2 class="section-title">1 · The bottom line</h2>
 
   <!-- ===== Profit this month ===== -->
   <section class="grid grid-3">
@@ -39,7 +44,35 @@
     </article>
   </section>
 
-  <!-- ===== Where the cash is (hidden by default) ===== -->
+  <!-- ===== 2. Where the income comes from ===== -->
+  <h2 class="section-title">2 · Where the income comes from</h2>
+  <section class="card">
+    <table class="table">
+      <thead><tr><th>Unit</th><th>What</th><th class="num">Income</th><th class="num">Share</th><th class="num">vs last month</th></tr></thead>
+      <tbody>
+      <tr th:each="u : ${view.units}">
+        <td><strong th:text="${u.name()}">Sports center</strong></td>
+        <td class="muted" th:text="${u.detail()}">detail</td>
+        <td class="num" th:text="${#numbers.formatDecimal(u.amount(), 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num" th:text="${#numbers.formatPercent(u.share(), 1, 0)}">0%</td>
+        <td class="num"><span class="delta" th:if="${u.delta() != null}" th:classappend="${u.delta().css}" th:text="${u.delta().text}">+0%</span>
+          <span class="muted" th:if="${u.delta() == null}">—</span></td>
+      </tr>
+      </tbody>
+      <tfoot>
+      <tr><td>Whole center</td><td></td>
+        <td class="num" th:text="${#numbers.formatDecimal(view.income, 1, 'COMMA', 0, 'POINT')}">0</td>
+        <td class="num">100%</td>
+        <td class="num"><span class="delta" th:if="${view.incomeDelta != null}" th:classappend="${view.incomeDelta.css}" th:text="${view.incomeDelta.text}">+0%</span></td>
+      </tr>
+      </tfoot>
+    </table>
+    <p class="muted small">Expenses of every unit are counted together in the bottom line; the split per unit, with shared costs, is on
+      <a th:href="@{/activities}">Profit by activity</a>.</p>
+  </section>
+
+  <!-- ===== 3. Where the cash is (hidden by default) ===== -->
+  <h2 class="section-title">3 · Where the money is</h2>
   <section class="grid grid-3">
     <article class="card stat">
       <div class="stat-label">Reception balance
@@ -69,7 +102,7 @@
     </article>
   </section>
 
-  <!-- ===== Needs attention ===== -->
+  <!-- ===== 4. Needs attention ===== -->
   <section class="card attention" th:if="${view.hasAttentionItems()}">
     <h2>Needs attention</h2>
     <ul class="attention-links">
@@ -115,13 +148,15 @@
     </div>
   </section>
 
-  <!-- ===== 12 months ===== -->
+  <!-- ===== 5. The trend ===== -->
+  <h2 class="section-title">4 · The last 12 months</h2>
   <section class="card">
-    <h2>Last 12 months</h2>
+    <h2>Income, expenses and net profit per month</h2>
     <div class="chart-box" th:utext="${view.chartSvg}"></div>
   </section>
 
-  <!-- ===== This month in detail ===== -->
+  <!-- ===== 6. This month in detail ===== -->
+  <h2 class="section-title">5 · This month in detail</h2>
   <section class="grid grid-3">
     <article class="card">
       <h2>Activities this month</h2>

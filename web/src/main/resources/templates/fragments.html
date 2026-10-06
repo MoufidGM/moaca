@@ -12,38 +12,59 @@
 
 <body>
 
-<!-- Top bar: brand, menu (mirrors the server-side rules), signed-in user -->
-<header th:fragment="topbar(active)" class="topbar">
-  <a class="brand" th:href="@{/}">CSLSM</a>
-  <nav class="menu" aria-label="Main">
-    <a th:href="@{/daily-logs}" th:classappend="${active == 'daily-logs'} ? 'active'">Daily logs</a>
-    <a th:href="@{/expenses}" th:classappend="${active == 'expenses'} ? 'active'">Expenses</a>
-    <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/today}" th:classappend="${active == 'today'} ? 'active'">Today</a>
-    <a sec:authorize="hasAnyRole('RESTAURANT_MANAGER','ADMIN','SUPER_ADMIN')" th:href="@{/restaurant}" th:classappend="${active == 'restaurant'} ? 'active'">Tiki Taka</a>
-    <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/salon}" th:classappend="${active == 'salon'} ? 'active'">Salon</a>
-    <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/dashboard}"
-       th:classappend="${active == 'dashboard'} ? 'active'">Dashboard</a>
-    <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/income}"
-       th:classappend="${active == 'income'} ? 'active'">Income</a>
-    <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/activities}"
-       th:classappend="${active == 'activities'} ? 'active'">Activities</a>
-    <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/reports}"
-       th:classappend="${active == 'reports'} ? 'active'">Reports</a>
-    <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/employees}"
-       th:classappend="${active == 'employees'} ? 'active'">Staff</a>
-    <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/reserves}"
-       th:classappend="${active == 'reserves'} ? 'active'">Cash &amp; Reserves</a>
-    <a sec:authorize="hasRole('SUPER_ADMIN')" th:href="@{/admin}"
-       th:classappend="${active == 'admin'} ? 'active'">Admin</a>
-  </nav>
-  <!-- Sign out is always there for a signed-in session, even one whose account is gone -->
-  <div class="who" sec:authorize="isAuthenticated()">
-    <a class="who-name" th:if="${currentUser != null}" th:href="@{/account/password}" title="Change your password" th:text="${currentUser.displayName}">Name</a>
-    <span class="badge" th:if="${currentUser != null}" th:text="${currentUser.roleLabel}">Role</span>
-    <form th:action="@{/logout}" method="post">
-      <button type="submit" class="btn-link">Sign out</button>
-    </form>
+<!-- Top bar: brand, the four areas of the app (mirroring the server-side rules), signed-in user.
+     Each page names itself (active); the area it belongs to is highlighted, and the bar below
+     lists that area's pages. -->
+<header th:fragment="topbar(active)"
+        th:with="area=${#lists.contains({'dashboard','today'}, active) ? 'overview'
+                 : (#lists.contains({'income','activities','reports'}, active) ? 'analysis'
+                 : (#lists.contains({'reserves'}, active) ? 'money'
+                 : (#lists.contains({'admin','files'}, active) ? 'admin' : 'operations')))}">
+  <div class="topbar">
+    <a class="brand" th:href="@{/}">CSLSM</a>
+    <nav class="menu" aria-label="Areas">
+      <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/dashboard}" th:classappend="${area == 'overview'} ? 'active'">Overview</a>
+      <a th:href="@{/daily-logs}" th:classappend="${area == 'operations'} ? 'active'">Daily work</a>
+      <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/income}" th:classappend="${area == 'analysis'} ? 'active'">Analysis</a>
+      <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/reserves}" th:classappend="${area == 'money'} ? 'active'">Cash &amp; bank</a>
+      <a sec:authorize="hasRole('SUPER_ADMIN')" th:href="@{/admin}" th:classappend="${area == 'admin'} ? 'active'">Admin</a>
+    </nav>
+    <!-- Sign out is always there for a signed-in session, even one whose account is gone -->
+    <div class="who" sec:authorize="isAuthenticated()">
+      <a class="who-name" th:if="${currentUser != null}" th:href="@{/account/password}" title="Change your password" th:text="${currentUser.displayName}">Name</a>
+      <span class="badge" th:if="${currentUser != null}" th:text="${currentUser.roleLabel}">Role</span>
+      <form th:action="@{/logout}" method="post">
+        <button type="submit" class="btn-link">Sign out</button>
+      </form>
+    </div>
   </div>
+  <nav class="subbar" aria-label="Pages" th:unless="${active == 'password'}">
+    <th:block th:if="${area == 'overview'}">
+      <a th:href="@{/dashboard}" th:classappend="${active == 'dashboard'} ? 'active'">Dashboard</a>
+      <a th:href="@{/today}" th:classappend="${active == 'today'} ? 'active'">Today</a>
+    </th:block>
+    <th:block th:if="${area == 'operations'}">
+      <a th:href="@{/daily-logs}" th:classappend="${active == 'daily-logs'} ? 'active'">Daily logs</a>
+      <a th:href="@{/expenses}" th:classappend="${active == 'expenses'} ? 'active'">Expenses</a>
+      <a sec:authorize="hasAnyRole('RESTAURANT_MANAGER','ADMIN','SUPER_ADMIN')" th:href="@{/restaurant}" th:classappend="${active == 'restaurant'} ? 'active'">Tiki Taka</a>
+      <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/salon}" th:classappend="${active == 'salon'} ? 'active'">Salon</a>
+      <a sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')" th:href="@{/employees}" th:classappend="${active == 'employees'} ? 'active'">Staff &amp; payroll</a>
+    </th:block>
+    <th:block th:if="${area == 'analysis'}">
+      <a th:href="@{/income}" th:classappend="${active == 'income'} ? 'active'">Income</a>
+      <a th:href="@{/activities}" th:classappend="${active == 'activities'} ? 'active'">Profit by activity</a>
+      <a th:href="@{/reports}" th:classappend="${active == 'reports'} ? 'active'">Reports</a>
+    </th:block>
+    <th:block th:if="${area == 'money'}">
+      <a th:href="@{/reserves}" th:classappend="${active == 'reserves'} ? 'active'">Reception, safe and bank accounts</a>
+      <a th:href="@{/restaurant}">Tiki Taka's till</a>
+    </th:block>
+    <th:block th:if="${area == 'admin'}">
+      <a th:href="@{/admin}" th:classappend="${active == 'admin'} ? 'active'">Accounts, categories, settings</a>
+      <a th:href="@{/admin/audit}">Audit log</a>
+      <a th:href="@{/files}" th:classappend="${active == 'files'} ? 'active'">Uploaded files</a>
+    </th:block>
+  </nav>
 </header>
 
 <!-- One-time messages after a redirect (success, information, error). -->

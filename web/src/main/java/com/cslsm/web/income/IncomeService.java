@@ -43,6 +43,11 @@ public class IncomeService
 	{
 	}
 
+	/** The activities of one unit (sports center, Tiki Taka, Salon) with the unit's subtotal. */
+	public record UnitGroup(String name, List<ActivityRow> rows, double amount, double share, double previous, Delta delta)
+	{
+	}
+
 	/** One day or one month; amount is null for a day with no log file (or a month without any). */
 	public record Bucket(String label, String title, LocalDate date, Double amount, Double previous, boolean missing)
 	{
@@ -51,7 +56,7 @@ public class IncomeService
 	public record IncomeView(IncomePeriod period, boolean compare,
 							 double total, double previousTotal, Delta delta,
 							 int daysLogged, List<LocalDate> missingDays, int missingCount, double dailyAverage, Bucket bestDay,
-							 List<ActivityRow> activities, List<PaymentRow> payments,
+							 List<ActivityRow> activities, List<UnitGroup> units, List<PaymentRow> payments,
 							 String chartSvg, boolean monthly, List<Bucket> buckets)
 	{
 	}
@@ -93,7 +98,7 @@ public class IncomeService
 		return new IncomeView(p, compare, total, previousTotal, Delta.of(total, previousTotal, true),
 				totals.size(), missing.size() > MAX_MISSING_LISTED ? List.of() : missing, missing.size(),
 				totals.isEmpty() ? 0 : total / totals.size(), best,
-				activities(p, total, previousTotal), payments(p, total),
+				activities(p, total, previousTotal), units(activities(p, total, previousTotal), total, previousTotal), payments(p, total),
 				chart, p.monthly(), buckets);
 	}
 
@@ -166,6 +171,29 @@ public class IncomeService
 		}
 		rows.sort((a, b) -> Double.compare(b.amount(), a.amount()));
 		return rows;
+	}
+
+	/** Rows grouped by unit; the center's departments first. Units with nothing in either period are left out. */
+	private static List<UnitGroup> units(List<ActivityRow> rows, double total, double previousTotal)
+	{
+		List<UnitGroup> out = new ArrayList<>();
+		for (String unit : List.of("Sports center", FinanceRepository.RESTAURANT, FinanceRepository.SALON))
+		{
+			List<ActivityRow> mine = rows.stream().filter(r -> unit.equals(unitOf(r.name()))).toList();
+			if (mine.isEmpty())
+			{
+				continue;
+			}
+			double amount = mine.stream().mapToDouble(ActivityRow::amount).sum();
+			double previous = mine.stream().mapToDouble(r -> r.previous() == null ? 0 : r.previous()).sum();
+			out.add(new UnitGroup(unit, mine, amount, total == 0 ? 0 : amount / total, previous, Delta.of(amount, previous, true)));
+		}
+		return out;
+	}
+
+	private static String unitOf(String activity)
+	{
+		return FinanceRepository.RESTAURANT.equals(activity) || FinanceRepository.SALON.equals(activity) ? activity : "Sports center";
 	}
 
 	private List<PaymentRow> payments(IncomePeriod p, double total)
