@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# Controls the CSLSM web app installed by deploy/mac/install-mac.sh (lives in ~/cslsm-web).
+#
+#   cslsm-web start | stop | restart     the launchd service (com.cslsm.web)
+#   cslsm-web status                     running or not, and the address to open
+#   cslsm-web logs [N]                   follow the log (last N lines first, default 100)
+#   cslsm-web user --create-user=NAME --role=ROLE [--name="Full name"]
+#   cslsm-web user --reset-password=NAME | --reset-2fa=NAME | --unlock=NAME
+#   cslsm-web backup                     consistent copy of the database into backups/
+#   cslsm-web update [--with-tests]      rebuild from the project folder and restart
+#   cslsm-web uninstall                  remove the service; data, files and config stay
+set -euo pipefail
+
+CSLSM_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+set -a
+# shellcheck disable=SC1091
+. "$CSLSM_HOME/config/cslsm.env"
+set +a
+LABEL="com.cslsm.web"
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+HOST_NAME="$(scutil --get LocalHostName 2>/dev/null || hostname -s).local"
+
+running() { launchctl print "gui/$UID/$LABEL" >/dev/null 2>&1; }
+answering() { [[ "$(curl -ksS -o /dev/null -w '%{http_code}' "https://127.0.0.1:$CSLSM_PORT/login" 2>/dev/null)" == "200" ]]; }
+
+do_start() {
+  if running; then echo "Already running."; else launchctl bootstrap "gui/$UID" "$PLIST"; echo "Started."; fi
+}
+do_stop() {
+  if running; then
+    launchctl bootout "gui/$UID/$LABEL"
+    for _ in $(seq 1 30); do running || break; sleep 1; done
+    echo "Stopped."
+  else
+    echo "Not running."
+  fi
+}
+
+case "${1:-help}" in
+  start) do_start ;;
+  stop) do_stop ;;
+  restart) do_stop; do_start ;;
+  status)
+    if running; then
+      PID="$(launchctl print "gui/$UID/$LABEL" 2>/dev/null | awk '/^\tpid = /{print $3}')"
+      echo "Service: running${PID:+ (pid $PID)}"
+    else
+      echo "Service: stopped"
+    fi
+    if answering; then echo "App: answering at https://$HOST_NAME:$CSLSM_PORT"; else echo "App: not answering on port $CSLSM_PORT"; fi
+    echo "Database: $CSLSM_DB_PATH"
+    ;;
+  logs) tail -n "${2:-100}" -f "$CSLSM_HOME/logs/cslsm-web.log" ;;
+  user)
+    shift
+    [[ $# -gt 0 ]] || { echo "Usage: cslsm-web user --create-user=NAME --role=ROLE | --reset-password=NAME | --reset-2fa=NAME | --unlock=NAME"; exit 1; }
+    "$JAVA_HOME/bin/java" -jar "$CSLSM_HOME/app/cslsm-web.jar" --spring.profiles.active=mac "$@"
+    ;;
+  backup)
+    mkdir -p "$CSLSM_HOME/backups"
+    OUT="$CSLSM_HOME/backups/daily_logs-$(date +%Y%m%d-%H%M%S).db"
+    sqlite3 "$CSLSM_DB_PATH" ".backup '$OUT'"
+    echo "Written: $OUT"
+    ;;
+  update) shift; exec "$CSLSM_PROJECT_DIR/deploy/mac/install-mac.sh" "$@" ;;
+  uninstall)
+    do_stop
+    rm -f "$PLIST"
+    echo "Service removed. Your data is still in $CSLSM_HOME (delete the folder to remove everything)."
+    ;;
+  *) sed -n '3,14p' "$0"; exit 1 ;;
+esac

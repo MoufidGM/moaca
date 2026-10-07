@@ -74,9 +74,9 @@ public class AdminService
 	{
 		requireSuperAdmin(actor);
 		String username = in.username() == null ? "" : in.username().trim();
-		if (!username.matches("[A-Za-z0-9._-]{3,32}"))
+		if (!username.matches("[A-Za-z0-9._-]{2,32}"))
 		{
-			throw new AdminException("The username must be 3 to 32 characters: letters, digits, dot, dash or underscore.");
+			throw new AdminException("The username must be 2 to 32 characters: letters, digits, dot, dash or underscore.");
 		}
 		if (users.findByUsername(username).isPresent())
 		{

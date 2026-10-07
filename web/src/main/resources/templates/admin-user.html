@@ -18,7 +18,7 @@
         th:action="${existing == null} ? @{/admin/users/new} : @{/admin/users/{id}(id=${existing.id()})}">
     <div class="form-grid">
       <label class="field" th:if="${existing == null}"><span>Username (used to sign in)</span>
-        <input type="text" name="username" th:value="${in.username()}" required maxlength="32" pattern="[A-Za-z0-9._-]{3,32}"
+        <input type="text" name="username" th:value="${in.username()}" required maxlength="32" pattern="[A-Za-z0-9._-]{2,32}"
                autocapitalize="none" spellcheck="false" autocomplete="off"></label>
       <div class="field" th:if="${existing != null}"><span>Username</span>
         <p class="rule-fixed" th:text="${existing.username()}">mo</p></div>

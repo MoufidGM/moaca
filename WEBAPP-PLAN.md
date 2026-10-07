@@ -230,6 +230,7 @@ folder — it can download encrypted files and nothing else.
 | M3b ✅ built | Activity structure v2: cost headings, staff with pay splits + payroll, allocation keys for utilities/common costs, Tiki Taka (restaurant manager role, daily sales, own till), Salon (daily sales entered by the reception) | — |
 | **M3c** ✅ built | Three daily logs (center DL-, Tiki Taka TT-, Salon SA-) with templates; Box and Danse departments; frequent expenses; two tracked bank accounts; chart tooltips | — |
 | **M3** ✅ built | Income page, Reports (P&L, expenses by category/activity, payment methods, year-over-year, profit by activity; Excel/CSV), audit log viewer, Administration page (accounts with temporary passwords, categories, year mode), own-password page | — |
+| M4a ✅ built | Trial deployment on the Mac (`deploy/mac/install-mac.sh`): launchd service, HTTPS with a self-signed certificate, copy of the database, `cslsm-web` control script | — |
 | **M4** | `install.sh`: systemd, nginx + mTLS + device certificates, ufw on `wg0`, device-bound logins | ~2 days |
 | **M5** | Encrypted backups: server job, MacBook/Mac Server pull, USB handling, restore script, drill | ~1–2 days |
 | **M6** | Cut-over: import the existing database, enroll the 5 machines, retire the JavaFX app | ~1 day |

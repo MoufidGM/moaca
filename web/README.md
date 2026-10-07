@@ -332,6 +332,48 @@ on the Administration page.
   frame-deny, no-referrer, and HSTS over HTTPS.
 - **Passwords** are hashed with Argon2id and must be at least 12 characters.
 
+## Deploy on your Mac (trial run)
+
+Before the Ubuntu server exists, the app can run on the Mac as a real service: its own
+folder, HTTPS, started at login and restarted if it stops, on a **copy** of the database.
+The desktop app and `data/daily_logs.db` are not touched.
+
+```bash
+deploy/mac/install-mac.sh
+```
+
+This builds the jar, creates `~/cslsm-web` (`app/`, `data/`, `files/`, `config/`, `logs/`,
+`backups/`), generates the secret key and a self-signed certificate for
+`<this-mac>.local` and the current Wi-Fi address, copies the database, registers the
+launchd agent `com.cslsm.web` and waits until the app answers. It then prints the address,
+`https://<this-mac>.local:8443`. The browser warns about the certificate once; continue.
+Other machines on the same network can open the same address (macOS may ask once whether
+`java` may accept incoming connections: allow).
+
+The first time, create the super admin from the terminal (hidden password prompt):
+
+```bash
+~/cslsm-web/cslsm-web user --create-user=mo --role=SUPER_ADMIN --name="Moufid"
+```
+
+Then sign in, scan the QR code, and create the other accounts on the Administration page.
+
+| Command | Use |
+|---|---|
+| `~/cslsm-web/cslsm-web status` | running or not, and the address |
+| `~/cslsm-web/cslsm-web logs` | follow the log |
+| `~/cslsm-web/cslsm-web stop` / `start` / `restart` | the service |
+| `~/cslsm-web/cslsm-web user …` | account commands (see below) |
+| `~/cslsm-web/cslsm-web backup` | consistent copy of the database into `backups/` |
+| `~/cslsm-web/cslsm-web update` | after a code change: rebuild and restart (`--with-tests` runs the tests first) |
+| `deploy/mac/install-mac.sh --fresh-copy` | start again from a new copy of `data/daily_logs.db` (web accounts are lost; the old trial database is kept in `backups/`) |
+| `deploy/mac/install-mac.sh --new-certificate` | after the Mac's name or network address changed |
+| `~/cslsm-web/cslsm-web uninstall` | remove the service; the folder stays |
+
+Open the trial with the `.local` name or the IP, not `localhost`: the app sends an HSTS
+header, and a browser that has seen it for `localhost` would then refuse the plain-http
+development instance on port 8080.
+
 ## Production (M4 preview)
 
 On the Ubuntu server the app listens on `127.0.0.1:8080` behind nginx. It reads these

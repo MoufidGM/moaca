@@ -1,0 +1,17 @@
+# Trial deployment on a Mac (deploy/mac/install-mac.sh): run with  --spring.profiles.active=mac
+#
+# Same as production (secure cookies, cached templates, strict headers) except that there is
+# no nginx in front: the app serves HTTPS itself with a self-signed certificate and listens
+# on every interface so the reception PCs on the same network can try it.
+# Paths and secrets come from ~/cslsm-web/config/cslsm.env.
+
+server:
+  address: 0.0.0.0
+  port: ${CSLSM_PORT:8443}
+  forward-headers-strategy: none
+  ssl:
+    enabled: true
+    key-store: ${CSLSM_KEYSTORE}
+    key-store-password: ${CSLSM_KEYSTORE_PASSWORD}
+    key-store-type: PKCS12
+    key-alias: cslsm

@@ -109,9 +109,9 @@ public class UserAdminCli implements ApplicationRunner
 	private void createUser(ApplicationArguments args)
 	{
 		String username = option(args, "create-user").trim();
-		if (!username.matches("[A-Za-z0-9._-]{3,32}"))
+		if (!username.matches("[A-Za-z0-9._-]{2,32}"))
 		{
-			throw new IllegalArgumentException("Username must be 3-32 characters: letters, digits, dot, dash, underscore.");
+			throw new IllegalArgumentException("Username must be 2-32 characters: letters, digits, dot, dash, underscore.");
 		}
 		if (users.findByUsername(username).isPresent())
 		{
